@@ -1,0 +1,13 @@
+[build]
+  publish = "."
+  command = "echo 'static'"
+
+[[redirects]]
+  from = "/"
+  to = "/rush_hour_distress_map.html"
+  status = 200
+
+[[redirects]]
+  from = "/pointcloud"
+  to = "/potree_viewer.html"
+  status = 200
