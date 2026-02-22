@@ -210,6 +210,52 @@
     }
   }).addTo(map);
 
+  // ── Gradient road corridors between consecutive intersections ──────
+  // Helper: compute color for a traffic-normalised value (0–1)
+  function trafficColor(pct) {
+    const r = Math.round(255 * pct);
+    const b = Math.round(255 * (1 - pct));
+    return `rgb(${r},40,${b})`;
+  }
+
+  // Define the ordered route of intersections along Centre St / South St
+  // Sorted south → north by latitude so consecutive entries are road-adjacent
+  const orderedRoute = intersections.slice().sort((a, b) => a.lat - b.lat);
+
+  const corridorLayer = L.layerGroup();
+  const NUM_SEGMENTS = 30; // sub-segments per road link for smooth gradient
+
+  for (let idx = 0; idx < orderedRoute.length - 1; idx++) {
+    const A = orderedRoute[idx];
+    const B = orderedRoute[idx + 1];
+    const pctA = maxTraffic > minTraffic ? (A.total - minTraffic) / (maxTraffic - minTraffic) : 0.5;
+    const pctB = maxTraffic > minTraffic ? (B.total - minTraffic) / (maxTraffic - minTraffic) : 0.5;
+
+    for (let s = 0; s < NUM_SEGMENTS; s++) {
+      const t0 = s / NUM_SEGMENTS;
+      const t1 = (s + 1) / NUM_SEGMENTS;
+      const tMid = (t0 + t1) / 2;
+
+      const lat0 = A.lat + t0 * (B.lat - A.lat);
+      const lon0 = A.lon + t0 * (B.lon - A.lon);
+      const lat1 = A.lat + t1 * (B.lat - A.lat);
+      const lon1 = A.lon + t1 * (B.lon - A.lon);
+
+      const segColor = trafficColor(pctA + tMid * (pctB - pctA));
+
+      corridorLayer.addLayer(L.polyline(
+        [[lat0, lon0], [lat1, lon1]], {
+          color: segColor,
+          weight: 8,
+          opacity: 0.85,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }
+      ));
+    }
+  }
+  corridorLayer.addTo(map);
+
   // ── Intersection markers (click for detail) ─────────────────────────
   const intMarkers = L.layerGroup();
   intersections.forEach(i => {
@@ -277,6 +323,7 @@
   const baseMaps = { 'Dark': darkTile, 'Light': lightTile };
   const overlays = {
     'Rush Hour Heatmap': heatLayer,
+    'Road Corridor Gradient': corridorLayer,
     'Intersection Points': intMarkers,
     'Distress Events': distressLayer
   };
@@ -298,6 +345,16 @@
           <span>${maxTraffic.toLocaleString()}</span>
         </div>
         <div style="font-size:11px;color:#777;margin-top:2px;">7–8 AM + 5–6 PM combined</div>
+      </div>
+
+      <div class="legend-section">
+        <div class="legend-label">Road Corridor</div>
+        <div class="heatbar" style="background:linear-gradient(to right, rgb(0,40,255), rgb(128,40,128), rgb(255,40,0));"></div>
+        <div class="heatbar-labels">
+          <span>Low traffic</span>
+          <span>High traffic</span>
+        </div>
+        <div style="font-size:11px;color:#777;margin-top:2px;">Gradient between intersections</div>
       </div>
 
       <div class="legend-section">
