@@ -217,11 +217,12 @@
         }
 
         // ── Load data ────────────────────────────────────────────────────────
-        const [trafficRows, distressRows, assetGeoJSON, chokepointGeoJSON] = await Promise.all([
+        const [trafficRows, distressRows, assetGeoJSON, chokepointGeoJSON, centerlinesGeoJSON] = await Promise.all([
           fetchCSV("combined_intersection_15min_counts.csv"),
           fetchCSV("all_intersection_distresses.csv"),
           fetch("aboveGroundAssets.geojson").then((r) => r.json()),
           fetch("chokepoints.geojson").then((r) => r.ok ? r.json() : null),
+          fetch("road_centerlines.geojson").then((r) => r.ok ? r.json() : null),
         ]);
 
         // ── Process traffic: aggregate rush-hour counts per intersection ────
@@ -352,14 +353,22 @@
           return `rgb(${r},40,${b})`;
         }
 
-        // Define the ordered route of intersections along Centre St / South St
-        // Sorted south → north by latitude so consecutive entries are road-adjacent
+        // Ordered route of intersections (south → north)
         const orderedRoute = intersections
           .slice()
           .sort((a, b) => a.lat - b.lat);
 
         const corridorLayer = L.layerGroup();
-        const NUM_SEGMENTS = 30; // sub-segments per road link for smooth gradient
+
+        // Build a lookup of centerline segments by their from/to intersection names
+        const clSegments = {}; // "fromName|toName" → [[lat,lon], …]
+        if (centerlinesGeoJSON && centerlinesGeoJSON.features) {
+          centerlinesGeoJSON.features.forEach(f => {
+            const p = f.properties;
+            const coords = f.geometry.coordinates.map(c => [c[1], c[0]]); // [lon,lat]→[lat,lon]
+            clSegments[p.from_name + "|" + p.to_name] = coords;
+          });
+        }
 
         for (let idx = 0; idx < orderedRoute.length - 1; idx++) {
           const A = orderedRoute[idx];
@@ -373,24 +382,30 @@
               ? (B.total - minTraffic) / (maxTraffic - minTraffic)
               : 0.5;
 
-          for (let s = 0; s < NUM_SEGMENTS; s++) {
-            const t0 = s / NUM_SEGMENTS;
-            const t1 = (s + 1) / NUM_SEGMENTS;
-            const tMid = (t0 + t1) / 2;
+          // Use pre-computed road centerline if available, else fall back to straight line
+          let pathCoords = clSegments[A.name + "|" + B.name];
+          if (!pathCoords || pathCoords.length < 2) {
+            // Straight-line fallback
+            const N = 30;
+            pathCoords = [];
+            for (let s = 0; s <= N; s++) {
+              const t = s / N;
+              pathCoords.push([
+                A.lat + t * (B.lat - A.lat),
+                A.lon + t * (B.lon - A.lon),
+              ]);
+            }
+          }
 
-            const lat0 = A.lat + t0 * (B.lat - A.lat);
-            const lon0 = A.lon + t0 * (B.lon - A.lon);
-            const lat1 = A.lat + t1 * (B.lat - A.lat);
-            const lon1 = A.lon + t1 * (B.lon - A.lon);
-
+          // Draw the path with a colour gradient (one sub-segment per consecutive pair)
+          const numPts = pathCoords.length;
+          for (let s = 0; s < numPts - 1; s++) {
+            const tMid = (s + 0.5) / (numPts - 1);
             const segColor = trafficColor(pctA + tMid * (pctB - pctA));
 
             corridorLayer.addLayer(
               L.polyline(
-                [
-                  [lat0, lon0],
-                  [lat1, lon1],
-                ],
+                [pathCoords[s], pathCoords[s + 1]],
                 {
                   color: segColor,
                   weight: 8,
