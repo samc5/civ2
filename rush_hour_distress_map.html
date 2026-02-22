@@ -1,339 +1,572 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rush Hour Traffic &amp; Distress Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; }
-    #map { width: 100vw; height: 100vh; }
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rush Hour Traffic &amp; Distress Map</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: #1a1a2e;
+      }
+      #map {
+        width: 100vw;
+        height: 100vh;
+      }
 
-    /* Legend */
-    .legend {
-      background: rgba(26, 26, 46, 0.95);
-      border: 1px solid #444;
-      border-radius: 8px;
-      padding: 14px 16px;
-      color: #ddd;
-      font-size: 13px;
-      line-height: 1.6;
-      max-width: 260px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-    }
-    .legend h4 {
-      margin: 0 0 8px;
-      font-size: 14px;
-      color: #4ec9b0;
-      border-bottom: 1px solid #333;
-      padding-bottom: 6px;
-    }
-    .legend-section { margin-bottom: 10px; }
-    .legend-section:last-child { margin-bottom: 0; }
-    .legend-label { font-weight: 600; margin-bottom: 4px; color: #aaa; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
-    .legend-circle {
-      border-radius: 50%;
-      flex-shrink: 0;
-      border: 1.5px solid rgba(255,255,255,0.3);
-    }
-    .heatbar {
-      width: 100%;
-      height: 14px;
-      border-radius: 3px;
-      background: linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
-      margin: 4px 0;
-    }
-    .heatbar-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: #888;
-    }
+      /* Legend */
+      .legend {
+        background: rgba(26, 26, 46, 0.95);
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 14px 16px;
+        color: #ddd;
+        font-size: 13px;
+        line-height: 1.6;
+        max-width: 260px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+      }
+      .legend h4 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: #4ec9b0;
+        border-bottom: 1px solid #333;
+        padding-bottom: 6px;
+      }
+      .legend-section {
+        margin-bottom: 10px;
+      }
+      .legend-section:last-child {
+        margin-bottom: 0;
+      }
+      .legend-label {
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: #aaa;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 3px;
+      }
+      .legend-circle {
+        border-radius: 50%;
+        flex-shrink: 0;
+        border: 1.5px solid rgba(255, 255, 255, 0.3);
+      }
+      .heatbar {
+        width: 100%;
+        height: 14px;
+        border-radius: 3px;
+        background: linear-gradient(
+          to right,
+          #0000ff,
+          #00ffff,
+          #00ff00,
+          #ffff00,
+          #ff0000
+        );
+        margin: 4px 0;
+      }
+      .heatbar-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #888;
+      }
 
-    /* Info panel */
-    .info-panel {
-      background: rgba(26, 26, 46, 0.95);
-      border: 1px solid #444;
-      border-radius: 8px;
-      padding: 12px 16px;
-      color: #ddd;
-      font-size: 13px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-      min-width: 200px;
-    }
-    .info-panel h4 {
-      margin: 0 0 6px;
-      font-size: 14px;
-      color: #4ec9b0;
-    }
-    .info-panel .stat { margin-bottom: 2px; }
-    .info-panel .stat-label { color: #888; }
+      /* Info panel */
+      .info-panel {
+        background: rgba(26, 26, 46, 0.95);
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 12px 16px;
+        color: #ddd;
+        font-size: 13px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+        min-width: 200px;
+      }
+      .info-panel h4 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        color: #4ec9b0;
+      }
+      .info-panel .stat {
+        margin-bottom: 2px;
+      }
+      .info-panel .stat-label {
+        color: #888;
+      }
 
-    /* Layer control styling override */
-    .leaflet-control-layers {
-      background: rgba(26, 26, 46, 0.95) !important;
-      border: 1px solid #444 !important;
-      border-radius: 8px !important;
-      color: #ddd !important;
-    }
-    .leaflet-control-layers-expanded {
-      padding: 8px 12px !important;
-    }
-    .leaflet-control-layers label {
-      color: #ddd !important;
-    }
-  </style>
-</head>
-<body>
+      /* Layer control styling override */
+      .leaflet-control-layers {
+        background: rgba(26, 26, 46, 0.95) !important;
+        border: 1px solid #444 !important;
+        border-radius: 8px !important;
+        color: #ddd !important;
+      }
+      .leaflet-control-layers-expanded {
+        padding: 8px 12px !important;
+      }
+      .leaflet-control-layers label {
+        color: #ddd !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
 
-<div id="map"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-<script>
-(async function () {
-  // ── Helpers ──────────────────────────────────────────────────────────
-  function fetchCSV(path) {
-    return new Promise((resolve, reject) => {
-      Papa.parse(path, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        dynamicTyping: true,
-        complete: r => resolve(r.data),
-        error: reject
-      });
-    });
-  }
-
-  // ── Load data ────────────────────────────────────────────────────────
-  const [trafficRows, distressRows] = await Promise.all([
-    fetchCSV('combined_intersection_15min_counts.csv'),
-    fetchCSV('all_intersection_distresses.csv')
-  ]);
-
-  // ── Process traffic: aggregate rush-hour counts per intersection ────
-  // Rush hour columns: 7:00–7:45 AM (morning) + 5:00–5:45 PM (evening)
-  const rushCols = [
-    '7:00 AM', '7:15 AM', '7:30 AM', '7:45 AM',
-    '5:00 PM', '5:15 PM', '5:30 PM', '5:45 PM'
-  ];
-
-  const intersectionMap = {};  // name → { lat, lon, total }
-  trafficRows.forEach(row => {
-    const name = row['Intersection name'];
-    if (!name) return;
-    const lat = parseFloat(row['latitude of intersection']);
-    const lon = parseFloat(row['longitude of intersection']);
-    if (isNaN(lat) || isNaN(lon)) return;
-
-    if (!intersectionMap[name]) {
-      intersectionMap[name] = { lat, lon, total: 0 };
-    }
-    rushCols.forEach(col => {
-      const v = parseInt(row[col], 10);
-      if (!isNaN(v)) intersectionMap[name].total += v;
-    });
-  });
-
-  const intersections = Object.entries(intersectionMap).map(([name, d]) => ({
-    name, lat: d.lat, lon: d.lon, total: d.total
-  }));
-
-  const maxTraffic = Math.max(...intersections.map(i => i.total));
-  const minTraffic = Math.min(...intersections.map(i => i.total));
-
-  console.log('Intersections:', intersections.length, 'Max rush-hour count:', maxTraffic);
-
-  // ── Process distresses: filter within 20m of a tracked intersection ─
-  const distresses = distressRows.filter(row => {
-    const dist = parseFloat(row['distance_to_intersection_m']);
-    return !isNaN(dist) && dist <= 20;
-  }).map(row => ({
-    id: row.id,
-    type: row.distress_type,
-    severity: (row.severity || '').toLowerCase(),
-    area: row.area_sq_ft,
-    length: row.length_ft,
-    image: row.image,
-    intersection: row.intersection,
-    distance: parseFloat(row.distance_to_intersection_m),
-    lat: parseFloat(row.lat),
-    lon: parseFloat(row.lon)
-  })).filter(d => !isNaN(d.lat) && !isNaN(d.lon));
-
-  console.log('Distresses within 20m:', distresses.length);
-
-  // ── Map setup ────────────────────────────────────────────────────────
-  const center = [
-    intersections.reduce((s, i) => s + i.lat, 0) / intersections.length,
-    intersections.reduce((s, i) => s + i.lon, 0) / intersections.length
-  ];
-
-  const map = L.map('map', { zoomControl: true }).setView(center, 15);
-
-  // Base tiles
-  const darkTile = L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      maxZoom: 20
-    }
-  );
-  const lightTile = L.tileLayer(
-    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      maxZoom: 20
-    }
-  );
-  darkTile.addTo(map);
-
-  // ── Heatmap layer ───────────────────────────────────────────────────
-  // Each intersection gets a heat point; intensity = normalised rush-hour count
-  const heatData = intersections.map(i => [
-    i.lat, i.lon, i.total / maxTraffic
-  ]);
-
-  const heatLayer = L.heatLayer(heatData, {
-    radius: 40,
-    blur: 30,
-    maxZoom: 18,
-    max: 1.0,
-    gradient: {
-      0.0: '#0000ff',
-      0.25: '#00ffff',
-      0.5: '#00ff00',
-      0.75: '#ffff00',
-      1.0: '#ff0000'
-    }
-  }).addTo(map);
-
-  // ── Gradient road corridors between consecutive intersections ──────
-  // Helper: compute color for a traffic-normalised value (0–1)
-  function trafficColor(pct) {
-    const r = Math.round(255 * pct);
-    const b = Math.round(255 * (1 - pct));
-    return `rgb(${r},40,${b})`;
-  }
-
-  // Define the ordered route of intersections along Centre St / South St
-  // Sorted south → north by latitude so consecutive entries are road-adjacent
-  const orderedRoute = intersections.slice().sort((a, b) => a.lat - b.lat);
-
-  const corridorLayer = L.layerGroup();
-  const NUM_SEGMENTS = 30; // sub-segments per road link for smooth gradient
-
-  for (let idx = 0; idx < orderedRoute.length - 1; idx++) {
-    const A = orderedRoute[idx];
-    const B = orderedRoute[idx + 1];
-    const pctA = maxTraffic > minTraffic ? (A.total - minTraffic) / (maxTraffic - minTraffic) : 0.5;
-    const pctB = maxTraffic > minTraffic ? (B.total - minTraffic) / (maxTraffic - minTraffic) : 0.5;
-
-    for (let s = 0; s < NUM_SEGMENTS; s++) {
-      const t0 = s / NUM_SEGMENTS;
-      const t1 = (s + 1) / NUM_SEGMENTS;
-      const tMid = (t0 + t1) / 2;
-
-      const lat0 = A.lat + t0 * (B.lat - A.lat);
-      const lon0 = A.lon + t0 * (B.lon - A.lon);
-      const lat1 = A.lat + t1 * (B.lat - A.lat);
-      const lon1 = A.lon + t1 * (B.lon - A.lon);
-
-      const segColor = trafficColor(pctA + tMid * (pctB - pctA));
-
-      corridorLayer.addLayer(L.polyline(
-        [[lat0, lon0], [lat1, lon1]], {
-          color: segColor,
-          weight: 8,
-          opacity: 0.85,
-          lineCap: 'round',
-          lineJoin: 'round'
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <script>
+      (async function () {
+        // ── Helpers ──────────────────────────────────────────────────────────
+        function fetchCSV(path) {
+          return new Promise((resolve, reject) => {
+            Papa.parse(path, {
+              download: true,
+              header: true,
+              skipEmptyLines: true,
+              dynamicTyping: true,
+              complete: (r) => resolve(r.data),
+              error: reject,
+            });
+          });
         }
-      ));
-    }
-  }
-  corridorLayer.addTo(map);
 
-  // ── Intersection markers (click for detail) ─────────────────────────
-  const intMarkers = L.layerGroup();
-  intersections.forEach(i => {
-    const pct = maxTraffic > minTraffic
-      ? (i.total - minTraffic) / (maxTraffic - minTraffic)
-      : 0.5;
-    // Color from blue → red
-    const r = Math.round(255 * pct);
-    const b = Math.round(255 * (1 - pct));
-    const color = `rgb(${r},40,${b})`;
+        // ── Load data ────────────────────────────────────────────────────────
+        const [trafficRows, distressRows, assetGeoJSON] = await Promise.all([
+          fetchCSV("combined_intersection_15min_counts.csv"),
+          fetchCSV("all_intersection_distresses.csv"),
+          fetch("aboveGroundAssets.geojson").then((r) => r.json()),
+        ]);
 
-    const marker = L.circleMarker([i.lat, i.lon], {
-      radius: 8,
-      fillColor: color,
-      fillOpacity: 0.9,
-      color: '#fff',
-      weight: 1.5
-    });
-    marker.bindPopup(`
+        // ── Process traffic: aggregate rush-hour counts per intersection ────
+        // Rush hour columns: 7:00–7:45 AM (morning) + 5:00–5:45 PM (evening)
+        const rushCols = [
+          "7:00 AM",
+          "7:15 AM",
+          "7:30 AM",
+          "7:45 AM",
+          "5:00 PM",
+          "5:15 PM",
+          "5:30 PM",
+          "5:45 PM",
+        ];
+
+        const intersectionMap = {}; // name → { lat, lon, total }
+        trafficRows.forEach((row) => {
+          const name = row["Intersection name"];
+          if (!name) return;
+          const lat = parseFloat(row["latitude of intersection"]);
+          const lon = parseFloat(row["longitude of intersection"]);
+          if (isNaN(lat) || isNaN(lon)) return;
+
+          if (!intersectionMap[name]) {
+            intersectionMap[name] = { lat, lon, total: 0 };
+          }
+          rushCols.forEach((col) => {
+            const v = parseInt(row[col], 10);
+            if (!isNaN(v)) intersectionMap[name].total += v;
+          });
+        });
+
+        const intersections = Object.entries(intersectionMap).map(
+          ([name, d]) => ({
+            name,
+            lat: d.lat,
+            lon: d.lon,
+            total: d.total,
+          }),
+        );
+
+        const maxTraffic = Math.max(...intersections.map((i) => i.total));
+        const minTraffic = Math.min(...intersections.map((i) => i.total));
+
+        console.log(
+          "Intersections:",
+          intersections.length,
+          "Max rush-hour count:",
+          maxTraffic,
+        );
+
+        // ── Process distresses: filter within 20m of a tracked intersection ─
+        const distresses = distressRows
+          .filter((row) => {
+            const dist = parseFloat(row["distance_to_intersection_m"]);
+            return !isNaN(dist) && dist <= 20;
+          })
+          .map((row) => ({
+            id: row.id,
+            type: row.distress_type,
+            severity: (row.severity || "").toLowerCase(),
+            area: row.area_sq_ft,
+            length: row.length_ft,
+            image: row.image,
+            intersection: row.intersection,
+            distance: parseFloat(row.distance_to_intersection_m),
+            lat: parseFloat(row.lat),
+            lon: parseFloat(row.lon),
+          }))
+          .filter((d) => !isNaN(d.lat) && !isNaN(d.lon));
+
+        console.log("Distresses within 20m:", distresses.length);
+
+        // ── Map setup ────────────────────────────────────────────────────────
+        const center = [
+          intersections.reduce((s, i) => s + i.lat, 0) / intersections.length,
+          intersections.reduce((s, i) => s + i.lon, 0) / intersections.length,
+        ];
+
+        const map = L.map("map", { zoomControl: true }).setView(center, 15);
+
+        // Base tiles
+        const darkTile = L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+          {
+            attribution: "&copy; OpenStreetMap &copy; CARTO",
+            maxZoom: 20,
+          },
+        );
+        const lightTile = L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+          {
+            attribution: "&copy; OpenStreetMap &copy; CARTO",
+            maxZoom: 20,
+          },
+        );
+        darkTile.addTo(map);
+
+        // ── Heatmap layer ───────────────────────────────────────────────────
+        // Each intersection gets a heat point; intensity = normalised rush-hour count
+        const heatData = intersections.map((i) => [
+          i.lat,
+          i.lon,
+          i.total / maxTraffic,
+        ]);
+
+        const heatLayer = L.heatLayer(heatData, {
+          radius: 40,
+          blur: 30,
+          maxZoom: 18,
+          max: 1.0,
+          gradient: {
+            0.0: "#0000ff",
+            0.25: "#00ffff",
+            0.5: "#00ff00",
+            0.75: "#ffff00",
+            1.0: "#ff0000",
+          },
+        }).addTo(map);
+
+        // ── Gradient road corridors between consecutive intersections ──────
+        // Helper: compute color for a traffic-normalised value (0–1)
+        function trafficColor(pct) {
+          const r = Math.round(255 * pct);
+          const b = Math.round(255 * (1 - pct));
+          return `rgb(${r},40,${b})`;
+        }
+
+        // Define the ordered route of intersections along Centre St / South St
+        // Sorted south → north by latitude so consecutive entries are road-adjacent
+        const orderedRoute = intersections
+          .slice()
+          .sort((a, b) => a.lat - b.lat);
+
+        const corridorLayer = L.layerGroup();
+        const NUM_SEGMENTS = 30; // sub-segments per road link for smooth gradient
+
+        for (let idx = 0; idx < orderedRoute.length - 1; idx++) {
+          const A = orderedRoute[idx];
+          const B = orderedRoute[idx + 1];
+          const pctA =
+            maxTraffic > minTraffic
+              ? (A.total - minTraffic) / (maxTraffic - minTraffic)
+              : 0.5;
+          const pctB =
+            maxTraffic > minTraffic
+              ? (B.total - minTraffic) / (maxTraffic - minTraffic)
+              : 0.5;
+
+          for (let s = 0; s < NUM_SEGMENTS; s++) {
+            const t0 = s / NUM_SEGMENTS;
+            const t1 = (s + 1) / NUM_SEGMENTS;
+            const tMid = (t0 + t1) / 2;
+
+            const lat0 = A.lat + t0 * (B.lat - A.lat);
+            const lon0 = A.lon + t0 * (B.lon - A.lon);
+            const lat1 = A.lat + t1 * (B.lat - A.lat);
+            const lon1 = A.lon + t1 * (B.lon - A.lon);
+
+            const segColor = trafficColor(pctA + tMid * (pctB - pctA));
+
+            corridorLayer.addLayer(
+              L.polyline(
+                [
+                  [lat0, lon0],
+                  [lat1, lon1],
+                ],
+                {
+                  color: segColor,
+                  weight: 8,
+                  opacity: 0.85,
+                  lineCap: "round",
+                  lineJoin: "round",
+                },
+              ),
+            );
+          }
+        }
+        corridorLayer.addTo(map);
+
+        // ── Intersection markers (click for detail) ─────────────────────────
+        const intMarkers = L.layerGroup();
+        intersections.forEach((i) => {
+          const pct =
+            maxTraffic > minTraffic
+              ? (i.total - minTraffic) / (maxTraffic - minTraffic)
+              : 0.5;
+          // Color from blue → red
+          const r = Math.round(255 * pct);
+          const b = Math.round(255 * (1 - pct));
+          const color = `rgb(${r},40,${b})`;
+
+          const marker = L.circleMarker([i.lat, i.lon], {
+            radius: 8,
+            fillColor: color,
+            fillOpacity: 0.9,
+            color: "#fff",
+            weight: 1.5,
+          });
+          marker.bindPopup(`
       <div style="font-family:sans-serif;font-size:13px;">
         <strong style="color:#4ec9b0;">${i.name}</strong><br>
         <span style="color:#aaa;">Rush-hour vehicles:</span> <b>${i.total.toLocaleString()}</b><br>
         <span style="color:#aaa;">Morning (7–8 AM) + Evening (5–6 PM)</span>
       </div>
     `);
-    intMarkers.addLayer(marker);
-  });
-  intMarkers.addTo(map);
+          intMarkers.addLayer(marker);
+        });
+        intMarkers.addTo(map);
 
-  // ── Distress markers ────────────────────────────────────────────────
-  const severityConfig = {
-    low:    { radius: 5,  color: '#f1c40f', label: 'Low' },
-    medium: { radius: 9,  color: '#e67e22', label: 'Medium' },
-    high:   { radius: 14, color: '#e74c3c', label: 'High' }
-  };
+        // ── Distress markers ────────────────────────────────────────────────
+        const severityConfig = {
+          low: { radius: 5, color: "#f1c40f", label: "Low" },
+          medium: { radius: 9, color: "#e67e22", label: "Medium" },
+          high: { radius: 14, color: "#e74c3c", label: "High" },
+        };
 
-  const distressLayer = L.layerGroup();
-  distresses.forEach(d => {
-    const cfg = severityConfig[d.severity] || severityConfig.low;
-    const marker = L.circleMarker([d.lat, d.lon], {
-      radius: cfg.radius,
-      fillColor: cfg.color,
-      fillOpacity: 0.75,
-      color: '#fff',
-      weight: 1
-    });
+        const distressLayer = L.layerGroup();
+        distresses.forEach((d) => {
+          const cfg = severityConfig[d.severity] || severityConfig.low;
+          const marker = L.circleMarker([d.lat, d.lon], {
+            radius: cfg.radius,
+            fillColor: cfg.color,
+            fillOpacity: 0.75,
+            color: "#fff",
+            weight: 1,
+          });
 
-    let popupHTML = `
+          let popupHTML = `
       <div style="font-family:sans-serif;font-size:13px;max-width:280px;">
-        <strong style="color:#4ec9b0;">${d.type.replace(/_/g, ' ')}</strong>
+        <strong style="color:#4ec9b0;">${d.type.replace(/_/g, " ")}</strong>
         <span style="background:${cfg.color};color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px;font-size:11px;">${cfg.label}</span><br>
         <span style="color:#aaa;">Intersection:</span> ${d.intersection}<br>
         <span style="color:#aaa;">Distance:</span> ${d.distance.toFixed(1)} m<br>`;
-    if (d.area) popupHTML += `<span style="color:#aaa;">Area:</span> ${d.area} sq ft<br>`;
-    if (d.length) popupHTML += `<span style="color:#aaa;">Length:</span> ${d.length} ft<br>`;
-    if (d.image) popupHTML += `<img src="${d.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:4px;margin-top:6px;">`;
-    popupHTML += `</div>`;
+          if (d.area)
+            popupHTML += `<span style="color:#aaa;">Area:</span> ${d.area} sq ft<br>`;
+          if (d.length)
+            popupHTML += `<span style="color:#aaa;">Length:</span> ${d.length} ft<br>`;
+          if (d.image)
+            popupHTML += `<img src="${d.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:4px;margin-top:6px;">`;
+          popupHTML += `</div>`;
 
-    marker.bindPopup(popupHTML);
-    distressLayer.addLayer(marker);
-  });
-  distressLayer.addTo(map);
+          marker.bindPopup(popupHTML);
+          distressLayer.addLayer(marker);
+        });
+        distressLayer.addTo(map);
 
-  // ── Layer control ───────────────────────────────────────────────────
-  const baseMaps = { 'Dark': darkTile, 'Light': lightTile };
-  const overlays = {
-    'Rush Hour Heatmap': heatLayer,
-    'Road Corridor Gradient': corridorLayer,
-    'Intersection Points': intMarkers,
-    'Distress Events': distressLayer
-  };
-  L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
+        // ── Above-Ground Asset Groups ────────────────────────────────────────
+        const assetGroups = {
+          "Traffic Signals & Lighting": {
+            types: [
+              "TRAFFIC_SIGNAL",
+              "SIGNAL_POLE",
+              "TRAFFIC_SIGNAL_POLE",
+              "FLASHER",
+              "LUMINARIES",
+            ],
+            color: "#eb3434",
+            icon: "🚦",
+          },
+          "Utilities & Covers": {
+            types: [
+              "MANHOLE_COVER",
+              "CATCH_BASIN",
+              "VALVE_COVER",
+              "HYDRANT",
+              "UTILITY_POLE",
+              "WATER_VALVE",
+            ],
+            color: "#3c9be0",
+            icon: "🔧",
+          },
+          "Pedestrian Infrastructure": {
+            types: [
+              "SIDEWALK",
+              "RAMP",
+              "CURB",
+              "CURB_CUT",
+              "DRIVEWAY",
+              "PEDESTRIAN_PUSH_BUTTON",
+              "STAND_ALONE_PED_PUSH_BUTTON",
+              "STAND_ALONE_PEDESTRIAN_HEAD",
+            ],
+            color: "#6fa395",
+            icon: "🚶",
+          },
+          "Street Furniture & Greenery": {
+            types: [
+              "BENCH",
+              "BIKE_RACK",
+              "TRASH_BIN",
+              "PLANTER",
+              "BUS_SHELTER",
+              "BUS_STOP",
+              "TREE",
+            ],
+            color: "#2ecc71",
+            icon: "🌳",
+          },
+          "Barriers & Fencing": {
+            types: [
+              "GUARDRAILS",
+              "RETAINING_WALL",
+              "JERSEY_BARRIER",
+              "FENCE",
+              "BANNER",
+            ],
+            color: "#e67e22",
+            icon: "🚧",
+          },
+          "Equipment & Other": {
+            types: [
+              "CCTV",
+              "CABINET",
+              "BOX",
+              "SIDEWALK_OBSTRUCTION",
+              "PARKING_WITHIN_20FT_OF_INTERSECTION",
+            ],
+            color: "#9b59b6",
+            icon: "📦",
+          },
+        };
 
-  // ── Legend ──────────────────────────────────────────────────────────
-  const legend = L.control({ position: 'bottomright' });
-  legend.onAdd = function () {
-    const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML = `
+        // Map from asset_type → color from GeoJSON style metadata
+        const assetTypeColors =
+          (assetGeoJSON.style && assetGeoJSON.style.asset_type_colors) || {};
+        const assetTypeLabels =
+          (assetGeoJSON.style && assetGeoJSON.style.asset_type_labels) || {};
+
+        // Build a lookup: asset_type → group name
+        const typeToGroup = {};
+        Object.entries(assetGroups).forEach(([groupName, cfg]) => {
+          cfg.types.forEach((t) => {
+            typeToGroup[t] = groupName;
+          });
+        });
+
+        // Create layer groups per asset group
+        const assetLayerGroups = {};
+        const assetGroupCounts = {};
+        Object.keys(assetGroups).forEach((g) => {
+          assetLayerGroups[g] = L.layerGroup();
+          assetGroupCounts[g] = 0;
+        });
+
+        // Process each feature from the GeoJSON
+        const assetPts = [];
+        (assetGeoJSON.features || []).forEach((feature) => {
+          const props = feature.properties || {};
+          const geom = feature.geometry;
+          if (!geom || geom.type !== "Point") return;
+
+          const [lon, lat] = geom.coordinates;
+          if (isNaN(lat) || isNaN(lon)) return;
+
+          const assetType = props.asset_type || "UNKNOWN";
+          const groupName = typeToGroup[assetType] || "Equipment & Other";
+          const groupCfg = assetGroups[groupName];
+          const pointColor = assetTypeColors[assetType] || groupCfg.color;
+          const label =
+            assetTypeLabels[assetType] || assetType.replace(/_/g, " ");
+
+          assetGroupCounts[groupName]++;
+          assetPts.push([lat, lon]);
+
+          const marker = L.circleMarker([lat, lon], {
+            radius: 5,
+            fillColor: pointColor,
+            fillOpacity: 0.85,
+            color: "#fff",
+            weight: 0.8,
+          });
+
+          let popupHTML = `
+      <div style="font-family:sans-serif;font-size:13px;max-width:300px;">
+        <strong style="color:#4ec9b0;">${label}</strong>
+        <span style="background:${pointColor};color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px;font-size:11px;">${groupName}</span><br>`;
+          if (props.condition)
+            popupHTML += `<span style="color:#aaa;">Condition:</span> ${props.condition}<br>`;
+          if (props.Type || props.type)
+            popupHTML += `<span style="color:#aaa;">Type:</span> ${props.Type || props.type}<br>`;
+          if (props.Material)
+            popupHTML += `<span style="color:#aaa;">Material:</span> ${props.Material}<br>`;
+          if (props.image_url)
+            popupHTML += `<img src="${props.image_url}" style="width:100%;max-height:180px;object-fit:cover;border-radius:4px;margin-top:6px;" onerror="this.style.display='none'">`;
+          popupHTML += `</div>`;
+
+          marker.bindPopup(popupHTML);
+          assetLayerGroups[groupName].addLayer(marker);
+        });
+
+        // Add asset layers to the map (off by default to avoid clutter)
+        // Users can toggle them on via the layer control
+
+        // ── Layer control ───────────────────────────────────────────────────
+        const baseMaps = { Dark: darkTile, Light: lightTile };
+        const overlays = {
+          "Rush Hour Heatmap": heatLayer,
+          "Road Corridor Gradient": corridorLayer,
+          "Intersection Points": intMarkers,
+          "Distress Events": distressLayer,
+        };
+        // Add asset group overlays
+        Object.keys(assetGroups).forEach((groupName) => {
+          const cfg = assetGroups[groupName];
+          overlays[`${cfg.icon} ${groupName}`] = assetLayerGroups[groupName];
+        });
+        L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
+
+        // ── Legend ──────────────────────────────────────────────────────────
+        const legend = L.control({ position: "bottomright" });
+        legend.onAdd = function () {
+          const div = L.DomUtil.create("div", "legend");
+          div.innerHTML = `
       <h4>Map Legend</h4>
 
       <div class="legend-section">
@@ -359,27 +592,52 @@
 
       <div class="legend-section">
         <div class="legend-label">Distress Severity</div>
-        ${Object.values(severityConfig).map(c => `
+        ${Object.values(severityConfig)
+          .map(
+            (c) => `
           <div class="legend-item">
             <div class="legend-circle" style="width:${c.radius * 2}px;height:${c.radius * 2}px;background:${c.color};"></div>
             <span>${c.label}</span>
           </div>
-        `).join('')}
+        `,
+          )
+          .join("")}
         <div style="font-size:11px;color:#777;margin-top:2px;">Only distresses within 20 m of intersection</div>
       </div>
-    `;
-    return div;
-  };
-  legend.addTo(map);
 
-  // ── Stats panel ────────────────────────────────────────────────────
-  const info = L.control({ position: 'topright' });
-  info.onAdd = function () {
-    const div = L.DomUtil.create('div', 'info-panel');
-    const totalVehicles = intersections.reduce((s, i) => s + i.total, 0);
-    const sevCounts = { high: 0, medium: 0, low: 0 };
-    distresses.forEach(d => { if (sevCounts[d.severity] !== undefined) sevCounts[d.severity]++; });
-    div.innerHTML = `
+      <div class="legend-section">
+        <div class="legend-label">Above-Ground Assets</div>
+        ${Object.entries(assetGroups)
+          .map(
+            ([name, cfg]) => `
+          <div class="legend-item">
+            <div class="legend-circle" style="width:10px;height:10px;background:${cfg.color};"></div>
+            <span>${cfg.icon} ${name} (${assetGroupCounts[name]})</span>
+          </div>
+        `,
+          )
+          .join("")}
+        <div style="font-size:11px;color:#777;margin-top:2px;">Toggle groups in layer control</div>
+      </div>
+    `;
+          return div;
+        };
+        legend.addTo(map);
+
+        // ── Stats panel ────────────────────────────────────────────────────
+        const info = L.control({ position: "topright" });
+        info.onAdd = function () {
+          const div = L.DomUtil.create("div", "info-panel");
+          const totalVehicles = intersections.reduce((s, i) => s + i.total, 0);
+          const sevCounts = { high: 0, medium: 0, low: 0 };
+          distresses.forEach((d) => {
+            if (sevCounts[d.severity] !== undefined) sevCounts[d.severity]++;
+          });
+          const totalAssets = Object.values(assetGroupCounts).reduce(
+            (s, n) => s + n,
+            0,
+          );
+          div.innerHTML = `
       <h4>Summary</h4>
       <div class="stat"><span class="stat-label">Intersections:</span> ${intersections.length}</div>
       <div class="stat"><span class="stat-label">Total rush-hour vehicles:</span> ${totalVehicles.toLocaleString()}</div>
@@ -389,19 +647,20 @@
         <span style="color:${severityConfig.medium.color};">● ${sevCounts.medium} medium</span> &nbsp;
         <span style="color:${severityConfig.low.color};">● ${sevCounts.low} low</span>
       </div>
+      <div class="stat" style="margin-top:4px;"><span class="stat-label">Above-ground assets:</span> ${totalAssets.toLocaleString()}</div>
     `;
-    return div;
-  };
-  info.addTo(map);
+          return div;
+        };
+        info.addTo(map);
 
-  // Fit bounds to show everything
-  const allPts = [
-    ...intersections.map(i => [i.lat, i.lon]),
-    ...distresses.map(d => [d.lat, d.lon])
-  ];
-  if (allPts.length) map.fitBounds(L.latLngBounds(allPts).pad(0.1));
-
-})();
-</script>
-</body>
+        // Fit bounds to show everything
+        const allPts = [
+          ...intersections.map((i) => [i.lat, i.lon]),
+          ...distresses.map((d) => [d.lat, d.lon]),
+          ...assetPts,
+        ];
+        if (allPts.length) map.fitBounds(L.latLngBounds(allPts).pad(0.1));
+      })();
+    </script>
+  </body>
 </html>
