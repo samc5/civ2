@@ -163,6 +163,30 @@
       .leaflet-control-layers label {
         color: #ddd !important;
       }
+
+      /* Chokepoint tooltips */
+      .cp-tooltip {
+        background: rgba(0,0,0,0.8) !important;
+        border: 1px solid #888 !important;
+        color: #fff !important;
+        font-size: 10px !important;
+        padding: 2px 6px !important;
+        border-radius: 3px !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.5) !important;
+        pointer-events: none !important;
+      }
+      .cp-tooltip::before {
+        border-right-color: rgba(0,0,0,0.8) !important;
+      }
+      .cp-tooltip-primary {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        border-color: #e74c3c !important;
+        padding: 3px 7px !important;
+      }
+      .cp-tooltip-primary::before {
+        border-right-color: rgba(0,0,0,0.8) !important;
+      }
     </style>
   </head>
   <body>
@@ -193,10 +217,11 @@
         }
 
         // ── Load data ────────────────────────────────────────────────────────
-        const [trafficRows, distressRows, assetGeoJSON] = await Promise.all([
+        const [trafficRows, distressRows, assetGeoJSON, chokepointGeoJSON] = await Promise.all([
           fetchCSV("combined_intersection_15min_counts.csv"),
           fetchCSV("all_intersection_distresses.csv"),
           fetch("aboveGroundAssets.geojson").then((r) => r.json()),
+          fetch("chokepoints.geojson").then((r) => r.ok ? r.json() : null),
         ]);
 
         // ── Process traffic: aggregate rush-hour counts per intersection ────
@@ -283,14 +308,16 @@
           "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
           {
             attribution: "&copy; OpenStreetMap &copy; CARTO",
-            maxZoom: 20,
+            maxZoom: 22,
+            maxNativeZoom: 20,
           },
         );
         const lightTile = L.tileLayer(
           "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
           {
             attribution: "&copy; OpenStreetMap &copy; CARTO",
-            maxZoom: 20,
+            maxZoom: 22,
+            maxNativeZoom: 20,
           },
         );
         darkTile.addTo(map);
@@ -674,6 +701,88 @@
         // Add asset layers to the map (off by default to avoid clutter)
         // Users can toggle them on via the layer control
 
+        // ── Chokepoint layer ─────────────────────────────────────────────────
+        const chokepointLayer = L.layerGroup();
+        let chokepointCount = 0;
+        let totalObstacleCount = 0;
+
+        if (chokepointGeoJSON && chokepointGeoJSON.features) {
+          const cpFeatures = chokepointGeoJSON.features;
+
+          // Severity color based on clear width (in feet)
+          function cpColor(clearFt) {
+            if (clearFt < 2) return "#e74c3c";    // critical (<2 ft)
+            if (clearFt < 3) return "#e67e22";    // tight (2–3 ft)
+            return "#f1c40f";                     // narrow (3–4 ft)
+          }
+          function cpLabel(clearFt) {
+            if (clearFt < 2) return "Critical";
+            if (clearFt < 3) return "Tight";
+            return "Narrow";
+          }
+
+          // Draw measurement lines (curb → sidewalk) with distance labels
+          cpFeatures.filter(f => f.properties.kind === "chokepoint_line" && f.properties.clear_width_ft < 4)
+            .forEach(f => {
+              const p = f.properties;
+              const coords = f.geometry.coordinates.map(c => [c[1], c[0]]);
+              const clearFt = p.clear_width_ft;
+              const color = cpColor(clearFt);
+              const isCp = p.is_chokepoint;
+
+              const line = L.polyline(coords, {
+                color: color,
+                weight: isCp ? 4 : 2,
+                opacity: isCp ? 0.95 : 0.6,
+              });
+
+              // Permanent label only for chokepoints (#1 per block); tooltip for others
+              line.bindTooltip(`${clearFt.toFixed(1)} ft`, {
+                permanent: isCp,
+                direction: "right",
+                offset: [8, 0],
+                className: "cp-tooltip" + (isCp ? " cp-tooltip-primary" : ""),
+              });
+
+              chokepointLayer.addLayer(line);
+            });
+
+          // Draw obstacle point markers
+          cpFeatures.filter(f => f.properties.kind === "obstacle_point")
+            .forEach(f => {
+              const p = f.properties;
+              const [lon, lat] = f.geometry.coordinates;
+              const color = cpColor(p.clear_width_ft);
+              const isCp = p.is_chokepoint;
+              totalObstacleCount++;
+              if (isCp) chokepointCount++;
+
+              const marker = L.circleMarker([lat, lon], {
+                radius: isCp ? 9 : 5,
+                fillColor: color,
+                fillOpacity: isCp ? 0.95 : 0.7,
+                color: isCp ? "#fff" : color,
+                weight: isCp ? 2.5 : 1,
+              });
+
+              let popup = `<div style="font-family:sans-serif;font-size:13px;max-width:280px;">`;
+              popup += `<strong style="color:#4ec9b0;">${p.obstacle_type.replace(/_/g, " ")}</strong>`;
+              popup += ` <span style="background:${color};color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px;font-size:11px;">${cpLabel(p.clear_width_ft)}</span>`;
+              if (isCp) popup += ` <span style="background:#e74c3c;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">CHOKEPOINT</span>`;
+              popup += `<br><span style="color:#aaa;">Clear width:</span> <b>${p.clear_width_ft.toFixed(1)} ft</b> (${p.clear_width_m.toFixed(2)} m)`;
+              popup += `<br><span style="color:#aaa;">Corridor width:</span> ${p.corridor_width_ft.toFixed(1)} ft (${p.corridor_width_m.toFixed(2)} m)`;
+              popup += `<br><span style="color:#aaa;">Reduction:</span> ${p.reduction_pct.toFixed(1)}%`;
+              popup += `<br><span style="color:#aaa;">Rank in block:</span> #${p.rank}`;
+              popup += `<br><span style="color:#aaa;">Block:</span> Curb ${p.curb_fid} / Sidewalk ${p.sidewalk_fid}`;
+              if (p.condition) popup += `<br><span style="color:#aaa;">Condition:</span> ${p.condition}`;
+              if (p.image_url) popup += `<img src="${p.image_url}" style="width:100%;max-height:160px;object-fit:cover;border-radius:4px;margin-top:6px;" onerror="this.style.display='none'">`;
+              popup += `</div>`;
+
+              marker.bindPopup(popup);
+              chokepointLayer.addLayer(marker);
+            });
+        }
+
         // ── Layer control ───────────────────────────────────────────────────
         const baseMaps = { Dark: darkTile, Light: lightTile };
         const overlays = {
@@ -690,13 +799,34 @@
         // Dedicated geometry layers for Sidewalk & Curb
         overlays["━ Sidewalks (" + sidewalkCount + ")"] = sidewalkLayer;
         overlays["┄ Curbs (" + curbCount + ")"] = curbLayer;
+        // Chokepoint layer
+        overlays["⚠ Chokepoints (" + chokepointCount + ")"] = chokepointLayer;
         // Add sidewalk and curb layers to map by default
         sidewalkLayer.addTo(map);
         curbLayer.addTo(map);
+        // Chokepoints only visible when zoomed in (>=17) to avoid clutter
+        const CP_MIN_ZOOM = 17;
+        let cpUserEnabled = true;  // track if user toggled it on/off
+        function updateChokepointVisibility() {
+          const z = map.getZoom();
+          if (cpUserEnabled && z >= CP_MIN_ZOOM && !map.hasLayer(chokepointLayer)) {
+            map.addLayer(chokepointLayer);
+          } else if (z < CP_MIN_ZOOM && map.hasLayer(chokepointLayer)) {
+            map.removeLayer(chokepointLayer);
+          }
+        }
+        map.on("zoomend", updateChokepointVisibility);
+        map.on("overlayadd", function(e) {
+          if (e.layer === chokepointLayer) cpUserEnabled = true;
+        });
+        map.on("overlayremove", function(e) {
+          if (e.layer === chokepointLayer) cpUserEnabled = false;
+        });
+        updateChokepointVisibility();
         L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
 
         // ── Legend ──────────────────────────────────────────────────────────
-        const legend = L.control({ position: "bottomright" });
+        const legend = L.control({ position: "bottomleft" });
         legend.onAdd = function () {
           const div = L.DomUtil.create("div", "legend");
           div.innerHTML = `
@@ -765,6 +895,23 @@
         </div>
         <div style="font-size:11px;color:#777;margin-top:2px;">Displayed as lines on map</div>
       </div>
+
+      <div class="legend-section">
+        <div class="legend-label">Sidewalk Chokepoints (${chokepointCount})</div>
+        <div class="legend-item">
+          <div class="legend-circle" style="width:12px;height:12px;background:#e74c3c;"></div>
+          <span>Critical (&lt;2 ft)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-circle" style="width:10px;height:10px;background:#e67e22;"></div>
+          <span>Tight (2–3 ft)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-circle" style="width:10px;height:10px;background:#f1c40f;"></div>
+          <span>Narrow (3–4 ft)</span>
+        </div>
+        <div style="font-size:11px;color:#777;margin-top:2px;">Lines show passable gap (obstacle→edge) with distance</div>
+      </div>
     `;
           return div;
         };
@@ -794,6 +941,11 @@
         <span style="color:${severityConfig.low.color};">● ${sevCounts.low} low</span>
       </div>
       <div class="stat" style="margin-top:4px;"><span class="stat-label">Above-ground assets:</span> ${totalAssets.toLocaleString()}</div>
+      <div class="stat" style="margin-top:4px;"><span class="stat-label">Sidewalk chokepoints:</span> ${chokepointCount}</div>
+      <div class="stat" style="margin-left:10px;font-size:12px;">
+        <span style="color:#e74c3c;">● ${chokepointGeoJSON ? chokepointGeoJSON.features.filter(f => f.properties.kind === 'obstacle_point' && f.properties.is_chokepoint && f.properties.clear_width_ft < 2).length : 0} critical</span> &nbsp;
+        <span style="color:#e67e22;">● ${chokepointGeoJSON ? chokepointGeoJSON.features.filter(f => f.properties.kind === 'obstacle_point' && f.properties.is_chokepoint && f.properties.clear_width_ft >= 2 && f.properties.clear_width_ft < 3).length : 0} tight</span>
+      </div>
     `;
           return div;
         };
