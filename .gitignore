@@ -1,3 +1,5 @@
 /scripts/processed/**
 /scripts/raw/**
 /venv
+.venv
+/output_laz
