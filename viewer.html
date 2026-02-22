@@ -7,6 +7,7 @@
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: sans-serif; }
+    canvas { display: block; }
 
     /* Loading overlay */
     #loading_overlay {
@@ -25,10 +26,28 @@
       transition: width 0.3s ease; border-radius: 4px; }
     #loading_status { margin-top: 10px; font-size: 13px; color: #aaa; }
 
+    /* Tile selector */
+    #tile_selector_panel {
+      position: fixed; top: 12px; left: 12px; z-index: 500;
+      background: rgba(30,30,30,0.95); border: 1px solid #444;
+      border-radius: 8px; padding: 12px 14px; color: #ddd; font-size: 13px;
+      max-width: 340px;
+    }
+    #tile_selector_panel h4 { margin: 0 0 8px; font-size: 14px; color: #4ec9b0;
+      border-bottom: 1px solid #333; padding-bottom: 6px; }
+    #tile_select {
+      width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid #555;
+      background: #222; color: #ddd; font-size: 12px; cursor: pointer;
+    }
+    #tile_info { margin-top: 6px; font-size: 11px; color: #888; }
+    #point_size_ctrl { margin-top: 8px; }
+    #point_size_ctrl label { font-size: 11px; color: #888; }
+    #point_size_slider { width: 100%; }
+
     /* Asset info panel */
     #info_panel {
-      position: fixed; top: 16px; right: 16px; z-index: 500;
-      width: 300px; background: rgba(30,30,30,0.95);
+      position: fixed; top: 12px; right: 12px; z-index: 500;
+      width: 280px; background: rgba(30,30,30,0.95);
       border: 1px solid #444; border-radius: 8px;
       padding: 12px; color: #ddd; font-size: 13px;
       display: none;
@@ -36,37 +55,29 @@
     #info_panel.visible { display: block; }
     #info_panel h3 { margin: 0 0 8px; font-size: 14px; color: #4ec9b0; }
     #info_panel img { width: 100%; border-radius: 4px; margin-bottom: 8px;
-      max-height: 200px; object-fit: cover; display: block; }
+      max-height: 180px; object-fit: cover; display: block; }
     #info_panel table { width: 100%; border-collapse: collapse; }
-    #info_panel td { padding: 3px 6px; vertical-align: top; }
+    #info_panel td { padding: 2px 6px; vertical-align: top; }
     #info_panel td:first-child { color: #888; white-space: nowrap; width: 40%; }
-    #info_close { float: right; cursor: pointer; color: #888; font-size: 16px;
-      line-height: 1; margin: -4px -4px 0 0; }
+    #info_close { float: right; cursor: pointer; color: #888; font-size: 16px; }
     #info_close:hover { color: #fff; }
 
-    /* Asset type legend/sidebar panel */
+    /* Asset type sidebar */
     #asset_sidebar {
-      position: fixed; bottom: 16px; left: 270px; z-index: 400;
+      position: fixed; bottom: 12px; left: 12px; z-index: 400;
       background: rgba(30,30,30,0.92); border: 1px solid #444;
       border-radius: 8px; padding: 10px 14px; color: #ddd;
-      max-height: 60vh; overflow-y: auto; font-size: 12px;
-      min-width: 200px;
+      max-height: 45vh; overflow-y: auto; font-size: 12px;
+      min-width: 200px; max-width: 300px;
     }
     #asset_sidebar h4 { margin: 0 0 8px; font-size: 13px; color: #4ec9b0;
       border-bottom: 1px solid #333; padding-bottom: 6px; }
-    .asset_row { display: flex; align-items: center; margin-bottom: 4px; cursor: pointer; }
+    .asset_row { display: flex; align-items: center; margin-bottom: 3px; cursor: pointer; }
     .asset_row:hover { background: rgba(255,255,255,0.05); border-radius: 3px; }
-    .asset_swatch { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-right: 8px; }
-    .asset_label { flex: 1; }
-    .asset_count { color: #666; margin-left: 6px; }
-    .asset_row input[type=checkbox] { margin-right: 6px; cursor: pointer; }
-
-    /* CRS info */
-    #crs_badge {
-      position: fixed; bottom: 8px; right: 8px; z-index: 300;
-      background: rgba(0,0,0,0.6); color: #888; font-size: 11px;
-      padding: 3px 8px; border-radius: 4px; display: none;
-    }
+    .asset_swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-right: 6px; }
+    .asset_label { flex: 1; font-size: 11px; }
+    .asset_count { color: #666; margin-left: 4px; font-size: 11px; }
+    .asset_row input[type=checkbox] { margin-right: 4px; cursor: pointer; }
 
     /* Error toast */
     #error_toast {
@@ -75,19 +86,33 @@
       padding: 10px 18px; border-radius: 6px; font-size: 13px;
       display: none; max-width: 500px; text-align: center;
     }
+
+    /* Controls hint */
+    #controls_hint {
+      position: fixed; bottom: 12px; right: 12px; z-index: 300;
+      background: rgba(0,0,0,0.6); color: #888; font-size: 11px;
+      padding: 6px 10px; border-radius: 4px; line-height: 1.5;
+    }
   </style>
 </head>
 <body>
-
-<!-- Potree required containers -->
-<div id="potree_render_area"></div>
-<div id="potree_sidebar_container"></div>
 
 <!-- Loading overlay -->
 <div id="loading_overlay">
   <div id="loading_message">Initializing viewer…</div>
   <div id="loading_bar_outer"><div id="loading_bar"></div></div>
   <div id="loading_status"></div>
+</div>
+
+<!-- Tile selector -->
+<div id="tile_selector_panel">
+  <h4>Point Cloud Tile</h4>
+  <select id="tile_select"></select>
+  <div id="tile_info"></div>
+  <div id="point_size_ctrl">
+    <label>Point size: <span id="ps_val">1.5</span></label>
+    <input id="point_size_slider" type="range" min="0.5" max="8" step="0.5" value="1.5">
+  </div>
 </div>
 
 <!-- Asset info panel -->
@@ -100,592 +125,547 @@
 
 <!-- Asset type sidebar -->
 <div id="asset_sidebar">
-  <h4>Asset Types</h4>
+  <h4>Nearby Assets</h4>
   <div id="asset_type_list"></div>
 </div>
 
-<!-- CRS badge -->
-<div id="crs_badge"></div>
 <!-- Error toast -->
 <div id="error_toast"></div>
 
+<!-- Controls hint -->
+<div id="controls_hint">
+  Left-drag: rotate &nbsp;|&nbsp; Right-drag: pan &nbsp;|&nbsp; Scroll: zoom
+</div>
+
 <script>
 // =============================================================================
-// CONFIGURATION — change POTREE_PATH to match your local Potree installation
+// CONFIGURATION
 // =============================================================================
-const POTREE_PATH = "../potree-1.8"; // e.g. "../potree-1.8" or "./potree-1.8"
+const POTREE_PATH = "../potree";
+const CHUNK_SIZE  = 500000; // Points per LAZ decode chunk
+const ASSET_RADIUS_M = 150; // Show assets within this distance of tile center
 // =============================================================================
 
-// Asset type color map — 27 types
 const COLOR_MAP = {
-  VALVE_COVER:            "#e74c3c",
-  MANHOLE_COVER:          "#3498db",
-  CATCH_BASIN:            "#2980b9",
-  RAMP:                   "#2ecc71",
-  DRIVEWAY:               "#f39c12",
-  CURB:                   "#e67e22",
-  SIDEWALK:               "#95a5a6",
-  PLANTER:                "#27ae60",
-  TRASH_BIN:              "#7f8c8d",
-  BUS_STOP:               "#f1c40f",
-  CABINET:                "#d35400",
-  HYDRANT:                "#c0392b",
-  CCTV:                   "#8e44ad",
-  TREE:                   "#1e8449",
-  BUS_SHELTER:            "#e91e63",
-  BIKE_RACK:              "#00bcd4",
-  BOX:                    "#795548",
-  BENCH:                  "#a0522d",
-  UTILITY_POLE:           "#9e9e9e",
-  SIGNAL_POLE:            "#ff9800",
-  FENCE:                  "#bc8f8f",
-  RETAINING_WALL:         "#607d8b",
-  PEDESTRIAN_PUSH_BUTTON: "#00acc1",
-  TRAFFIC_SIGNAL:         "#f44336",
-  FLASHER:                "#ff4081",
-  LUMINARIES:             "#ffd54f",
-  JERSEY_BARRIER:         "#bdbdbd",
+  VALVE_COVER: "#e74c3c", MANHOLE_COVER: "#3498db", CATCH_BASIN: "#2980b9",
+  RAMP: "#2ecc71", DRIVEWAY: "#f39c12", CURB: "#e67e22", SIDEWALK: "#95a5a6",
+  PLANTER: "#27ae60", TRASH_BIN: "#7f8c8d", BUS_STOP: "#f1c40f",
+  CABINET: "#d35400", HYDRANT: "#c0392b", CCTV: "#8e44ad", TREE: "#1e8449",
+  BUS_SHELTER: "#e91e63", BIKE_RACK: "#00bcd4", BOX: "#795548",
+  BENCH: "#a0522d", UTILITY_POLE: "#9e9e9e", SIGNAL_POLE: "#ff9800",
+  FENCE: "#bc8f8f", RETAINING_WALL: "#607d8b",
+  PEDESTRIAN_PUSH_BUTTON: "#00acc1", TRAFFIC_SIGNAL: "#f44336",
+  FLASHER: "#ff4081", LUMINARIES: "#ffd54f", JERSEY_BARRIER: "#bdbdbd",
 };
 
-function colorHexToRgb(hex) {
-  const r = parseInt(hex.slice(1,3),16)/255;
-  const g = parseInt(hex.slice(3,5),16)/255;
-  const b = parseInt(hex.slice(5,7),16)/255;
-  return {r, g, b};
+function hexToRgb01(hex) {
+  return [parseInt(hex.slice(1,3),16)/255, parseInt(hex.slice(3,5),16)/255, parseInt(hex.slice(5,7),16)/255];
 }
 
-// ---- Script/CSS loader -------------------------------------------------------
-function loadCSS(href) {
-  return new Promise(resolve => {
-    const link = document.createElement("link");
-    link.rel = "stylesheet"; link.type = "text/css"; link.href = href;
-    link.onload = resolve; link.onerror = resolve; // continue on error
-    document.head.appendChild(link);
-  });
+// ── UI helpers ──────────────────────────────────────────────────────────
+function setMsg(msg, status) {
+  document.getElementById("loading_message").textContent = msg;
+  if (status !== undefined) document.getElementById("loading_status").textContent = status;
+}
+function setProgress(pct) {
+  document.getElementById("loading_bar").style.width = Math.round(pct) + "%";
+}
+function hideLoading() { document.getElementById("loading_overlay").classList.add("hidden"); }
+function showLoading() { document.getElementById("loading_overlay").classList.remove("hidden"); }
+function showError(msg) {
+  const el = document.getElementById("error_toast");
+  el.textContent = msg; el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 8000);
 }
 
+// ── Script loader ───────────────────────────────────────────────────────
 function loadScript(src) {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = () => { console.warn("Could not load:", src); resolve(); };
+    s.src = src; s.onload = resolve;
+    s.onerror = () => reject(new Error("Failed to load: " + src));
     document.head.appendChild(s);
   });
 }
 
-async function loadDependencies() {
-  setLoadingMsg("Loading Potree libraries…");
+// ── Haversine distance (meters) ─────────────────────────────────────────
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toRad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toRad, dLon = (lon2 - lon1) * toRad;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*toRad)*Math.cos(lat2*toRad)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 
-  // CSS (fire and forget — non-blocking render)
-  loadCSS(POTREE_PATH + "/build/potree/potree.css");
-  loadCSS(POTREE_PATH + "/libs/jquery-ui/jquery-ui.min.css");
-  loadCSS(POTREE_PATH + "/libs/spectrum/spectrum.css");
-  loadCSS(POTREE_PATH + "/libs/jstree/themes/mixed/style.css");
-
-  // JS — must be sequential because of inter-dependencies
-  const scripts = [
-    POTREE_PATH + "/libs/jquery/jquery-3.1.1.min.js",
-    POTREE_PATH + "/libs/spectrum/spectrum.js",
-    POTREE_PATH + "/libs/jquery-ui/jquery-ui.min.js",
-    POTREE_PATH + "/libs/three.js/build/three.min.js",
-    POTREE_PATH + "/libs/other/BinaryHeap.js",
-    POTREE_PATH + "/libs/tween/tween.min.js",
-    POTREE_PATH + "/libs/d3/d3.min.js",
-    POTREE_PATH + "/libs/proj4/proj4.js",
-    POTREE_PATH + "/libs/openlayers3/ol.js",
-    POTREE_PATH + "/libs/i18n/i18next.xhr-backend.min.js",
-    POTREE_PATH + "/libs/jstree/jstree.min.js",
-    POTREE_PATH + "/build/potree/potree.js",
-    POTREE_PATH + "/libs/plasio/js/laslaz.js",
-  ];
-
-  for (const src of scripts) {
-    await loadScript(src);
+// ── LAZ Loader (Potree's LASLAZWorker → LASDecoderWorker pipeline) ─────
+class LAZLoader {
+  constructor(potreePath) {
+    this.lazWorkerURL = potreePath + "/build/potree/workers/LASLAZWorker.js";
+    this.decWorkerURL = potreePath + "/build/potree/workers/LASDecoderWorker.js";
   }
-}
 
-// ---- UI helpers ---------------------------------------------------------------
-function setLoadingMsg(msg, status) {
-  document.getElementById("loading_message").textContent = msg;
-  if (status !== undefined) {
-    document.getElementById("loading_status").textContent = status;
-  }
-}
+  async load(url, onProgress) {
+    onProgress = onProgress || (() => {});
+    onProgress(0);
 
-function setLoadingProgress(loaded, total) {
-  const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
-  document.getElementById("loading_bar").style.width = pct + "%";
-  document.getElementById("loading_status").textContent = `${loaded} / ${total} tiles loaded`;
-}
+    // 1. Fetch the LAZ file (stream for progress)
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error("HTTP " + resp.status + " fetching LAZ");
+    const contentLength = +resp.headers.get("Content-Length") || 0;
 
-function hideLoading() {
-  document.getElementById("loading_overlay").classList.add("hidden");
-}
-
-function showError(msg) {
-  const el = document.getElementById("error_toast");
-  el.textContent = msg; el.style.display = "block";
-  setTimeout(() => { el.style.display = "none"; }, 6000);
-}
-
-// ---- CRS detection -----------------------------------------------------------
-function detectCRS(pointcloud) {
-  // Gather bounding box info from multiple possible locations
-  let rawCenter = null;
-
-  try {
-    // Option 1: pcoGeometry tightBoundingBox with offset
-    const pco = pointcloud.pcoGeometry;
-    if (pco) {
-      const off = pco.offset || {x:0,y:0,z:0};
-      const bb  = pco.tightBoundingBox || pco.boundingBox;
-      if (bb) {
-        const c = new THREE.Vector3();
-        bb.getCenter(c);
-        rawCenter = { x: c.x + off.x, y: c.y + off.y, z: c.z + off.z };
+    let buffer;
+    if (contentLength && resp.body) {
+      const reader = resp.body.getReader();
+      const chunks = []; let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value); received += value.length;
+        onProgress(Math.min(45, 45 * received / contentLength));
       }
-    }
-  } catch(e) { /* ignore */ }
-
-  if (!rawCenter) {
-    try {
-      // Option 2: pointcloud.position itself holds the scene translation
-      rawCenter = {
-        x: pointcloud.position.x,
-        y: pointcloud.position.y,
-        z: pointcloud.position.z,
-      };
-    } catch(e) { /* ignore */ }
-  }
-
-  if (!rawCenter) {
-    try {
-      // Option 3: geometry bounding box
-      const bb = pointcloud.geometry && pointcloud.geometry.boundingBox;
-      if (bb) {
-        const c = new THREE.Vector3();
-        bb.getCenter(c);
-        rawCenter = { x: c.x, y: c.y, z: c.z };
-      }
-    } catch(e) { /* ignore */ }
-  }
-
-  const x = rawCenter ? rawCenter.x : 0;
-  const z = rawCenter ? rawCenter.z : 0;
-
-  console.log("CRS detection — rawCenter:", rawCenter);
-
-  // UTM Zone 19N: x roughly 280 000 – 400 000 and larger than MA State Plane
-  if (x > 280000 && x < 420000) {
-    console.log("Detected CRS: UTM Zone 19N (EPSG:32619)");
-    return {
-      name: "UTM19N",
-      proj4def: "+proj=utm +zone=19 +datum=WGS84 +units=m +no_defs",
-      zRef: z,
-    };
-  }
-  // MA State Plane: x roughly 180 000 – 280 000
-  if (x > 180000 && x < 280000) {
-    console.log("Detected CRS: MA State Plane (EPSG:26987)");
-    return {
-      name: "MASP",
-      proj4def: "+proj=lcc +lat_1=42.68333333333333 +lat_2=41.71666666666667" +
-                " +lat_0=41 +lon_0=-71.5 +x_0=200000 +y_0=750000" +
-                " +ellps=GRS80 +datum=NAD83 +units=m +no_defs",
-      zRef: z,
-    };
-  }
-  // Geographic / near-zero (WGS84 passthrough or offset-corrected)
-  if (Math.abs(x) < 180) {
-    console.log("Detected CRS: WGS84 geographic (passthrough)");
-    return { name: "WGS84", proj4def: null, zRef: z };
-  }
-
-  // Fallback: assume UTM 19N for this region
-  console.warn("CRS detection inconclusive (x=" + x + "), defaulting to UTM 19N");
-  return {
-    name: "UTM19N",
-    proj4def: "+proj=utm +zone=19 +datum=WGS84 +units=m +no_defs",
-    zRef: 0,
-  };
-}
-
-function transformWGS84(lon, lat, crs) {
-  if (!crs || !crs.proj4def) return [lon, lat];
-  try {
-    proj4.defs("LOCAL_CRS", crs.proj4def);
-    return proj4("WGS84", "LOCAL_CRS", [lon, lat]);
-  } catch(e) {
-    console.warn("proj4 transform failed:", e);
-    return [lon, lat];
-  }
-}
-
-// ---- Asset markers -----------------------------------------------------------
-const assetGroups = new Map(); // type → { points: THREE.Points, features: [] }
-
-function createAssetMarkers(assetsData, scene, crs) {
-  // Group features by asset_type
-  const groups = {};
-  for (const f of assetsData.features) {
-    const type = f.properties.asset_type || "UNKNOWN";
-    if (!groups[type]) groups[type] = [];
-    groups[type].push(f);
-  }
-
-  const color = new THREE.Color();
-
-  for (const [type, features] of Object.entries(groups)) {
-    const hex   = COLOR_MAP[type] || "#ffffff";
-    const rgb   = colorHexToRgb(hex);
-    const count = features.length;
-
-    const positions = new Float32Array(count * 3);
-    const colors    = new Float32Array(count * 3);
-
-    for (let i = 0; i < count; i++) {
-      const f  = features[i];
-      const g  = f.geometry;
-      let lon, lat;
-
-      if (g.type === "Point") {
-        [lon, lat] = g.coordinates;
-      } else if (g.type === "LineString") {
-        // midpoint
-        const coords = g.coordinates;
-        const mid = (coords.length - 1) / 2;
-        const lo  = Math.floor(mid);
-        const hi  = Math.min(lo + 1, coords.length - 1);
-        const t   = mid - lo;
-        lon = coords[lo][0] + t * (coords[hi][0] - coords[lo][0]);
-        lat = coords[lo][1] + t * (coords[hi][1] - coords[lo][1]);
-      } else {
-        lon = f.geometry.coordinates[0];
-        lat = f.geometry.coordinates[1];
-      }
-
-      const [px, py] = transformWGS84(lon, lat, crs);
-      positions[i*3]   = px;
-      positions[i*3+1] = py;
-      positions[i*3+2] = crs.zRef + 2; // 2 m above the detected z reference
-
-      colors[i*3]   = rgb.r;
-      colors[i*3+1] = rgb.g;
-      colors[i*3+2] = rgb.b;
-    }
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute("color",    new THREE.BufferAttribute(colors,    3));
-
-    const mat = new THREE.PointsMaterial({
-      size: 8,
-      sizeAttenuation: false, // constant pixel size
-      vertexColors: true,
-      depthTest: true,
-      depthWrite: false,
-    });
-
-    const pts = new THREE.Points(geo, mat);
-    pts.name  = "assets_" + type;
-
-    scene.add(pts);
-    assetGroups.set(type, { points: pts, features, hex, count });
-  }
-
-  console.log("Created asset markers for", Object.keys(groups).length, "types,",
-              assetsData.features.length, "total features");
-}
-
-// ---- Click → info panel ------------------------------------------------------
-let lastCRS = null;
-
-function setupClickHandler(viewer) {
-  const canvas = viewer.renderer.domElement;
-
-  canvas.addEventListener("click", e => {
-    const rect  = canvas.getBoundingClientRect();
-    const mouseX = (e.clientX - rect.left) * (canvas.width  / rect.width);
-    const mouseY = (e.clientY - rect.top)  * (canvas.height / rect.height);
-
-    const camera = viewer.scene.getActiveCamera();
-    if (!camera) return;
-
-    let bestFeature = null;
-    let bestDist    = Infinity;
-    const THRESHOLD_PX = 18;
-
-    for (const [, group] of assetGroups) {
-      if (!group.points.visible) continue;
-
-      const pos = group.points.geometry.getAttribute("position");
-      const mat = group.points.matrixWorld;
-
-      for (let i = 0; i < pos.count; i++) {
-        const world = new THREE.Vector3(
-          pos.getX(i), pos.getY(i), pos.getZ(i)
-        );
-        world.applyMatrix4(mat);
-
-        const clip = world.clone().project(camera);
-        if (clip.z > 1) continue; // behind camera
-
-        const sx = (clip.x +  1) / 2 * canvas.width;
-        const sy = (-clip.y + 1) / 2 * canvas.height;
-        const d  = Math.sqrt((sx - mouseX)**2 + (sy - mouseY)**2);
-
-        if (d < bestDist) {
-          bestDist    = d;
-          bestFeature = group.features[i];
-        }
-      }
-    }
-
-    if (bestFeature && bestDist < THRESHOLD_PX) {
-      showInfoPanel(bestFeature);
+      buffer = new Uint8Array(received);
+      let off = 0;
+      for (const c of chunks) { buffer.set(c, off); off += c.length; }
+      buffer = buffer.buffer;
     } else {
-      hideInfoPanel();
+      buffer = await resp.arrayBuffer();
+      onProgress(45);
     }
-  });
-}
 
-function showInfoPanel(feature) {
-  const p   = feature.properties;
-  const panel = document.getElementById("info_panel");
+    // 2. Decompress LAZ → raw point bytes
+    const raw = await this._decompress(buffer, p => onProgress(45 + p * 35));
 
-  document.getElementById("info_type").textContent = p.asset_type || "Asset";
-
-  const img = document.getElementById("info_img");
-  if (p.image_url) {
-    img.src = p.image_url; img.style.display = "block";
-  } else {
-    img.src = ""; img.style.display = "none";
+    // 3. Decode raw bytes → positions/colors
+    const result = await this._decode(raw, p => onProgress(80 + p * 20));
+    onProgress(100);
+    return result;
   }
 
-  const fields = [
-    ["Feature ID",  p.feature_id    || "—"],
-    ["Condition",   p.condition     || "—"],
-    ["Tile",        p.tile_file     || "—"],
-    ["Dataset",     p.street_dataset|| "—"],
-    ["Type",        p.Type          || "—"],
-    ["Material",    p.Material      || "—"],
-  ];
+  _decompress(arraybuffer, onProgress) {
+    return new Promise((resolve, reject) => {
+      const w = new Worker(this.lazWorkerURL);
+      let header = null;
+      const allChunks = [];
+      let total = 0, read = 0;
 
-  const tbody = document.querySelector("#info_table tbody");
-  tbody.innerHTML = "";
-  for (const [label, value] of fields) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${label}</td><td>${value}</td>`;
-    tbody.appendChild(tr);
-  }
-
-  panel.classList.add("visible");
-}
-
-function hideInfoPanel() {
-  document.getElementById("info_panel").classList.remove("visible");
-}
-
-// ---- Asset type sidebar ------------------------------------------------------
-function buildSidebar() {
-  const list = document.getElementById("asset_type_list");
-  list.innerHTML = "";
-
-  // Sort by count descending
-  const sorted = [...assetGroups.entries()]
-    .sort((a,b) => b[1].count - a[1].count);
-
-  for (const [type, group] of sorted) {
-    const row = document.createElement("div");
-    row.className = "asset_row";
-
-    const cb = document.createElement("input");
-    cb.type = "checkbox"; cb.checked = true;
-    cb.addEventListener("change", () => {
-      group.points.visible = cb.checked;
+      w.onmessage = e => {
+        const m = e.data;
+        if (m.type === "open") {
+          if (m.status !== 1) { reject(new Error("LAZ open failed")); w.terminate(); return; }
+          w.postMessage({ type: "header" });
+        } else if (m.type === "header" && m.header) {
+          header = m.header; total = header.pointsCount;
+          w.postMessage({ type: "read", start: 0, count: Math.min(CHUNK_SIZE, total), skip: 1 });
+        } else if (m.type === "header" && m.buffer) {
+          read += m.count;
+          allChunks.push({ buffer: m.buffer, count: m.count });
+          onProgress(read / total);
+          if (m.hasMoreData) {
+            w.postMessage({ type: "read", start: read, count: Math.min(CHUNK_SIZE, total - read), skip: 1 });
+          } else {
+            w.postMessage({ type: "close" });
+          }
+        } else if (m.type === "close") {
+          w.terminate();
+          resolve({ header, chunks: allChunks, totalPoints: read });
+        }
+      };
+      w.onerror = e => { reject(e); w.terminate(); };
+      w.postMessage({ type: "open", arraybuffer: arraybuffer }, [arraybuffer]);
     });
+  }
 
-    const swatch = document.createElement("div");
-    swatch.className = "asset_swatch";
-    swatch.style.background = group.hex;
-
-    const label = document.createElement("span");
-    label.className = "asset_label";
-    label.textContent = type.replace(/_/g, " ");
-
-    const count = document.createElement("span");
-    count.className = "asset_count";
-    count.textContent = "(" + group.count + ")";
-
-    row.appendChild(cb);
-    row.appendChild(swatch);
-    row.appendChild(label);
-    row.appendChild(count);
-    list.appendChild(row);
-
-    // Clicking the row toggles checkbox
-    row.addEventListener("click", ev => {
-      if (ev.target !== cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event("change")); }
+  _decode({ header, chunks, totalPoints }, onProgress) {
+    const ps = header.pointsStructSize;
+    const merged = new ArrayBuffer(totalPoints * ps);
+    const dst = new Uint8Array(merged);
+    let off = 0;
+    for (const c of chunks) {
+      dst.set(new Uint8Array(c.buffer), off);
+      off += c.count * ps;
+    }
+    return new Promise((resolve, reject) => {
+      const w = new Worker(this.decWorkerURL);
+      w.onmessage = e => {
+        w.terminate(); onProgress(1);
+        resolve({
+          positions: new Float32Array(e.data.position),
+          colors: new Uint8Array(e.data.color),
+          intensity: new Float32Array(e.data.intensity),
+          mean: e.data.mean,
+          tightBoundingBox: e.data.tightBoundingBox,
+          numPoints: totalPoints,
+          header: header,
+        });
+      };
+      w.onerror = e => { reject(e); w.terminate(); };
+      w.postMessage({
+        buffer: merged, numPoints: totalPoints, pointSize: ps,
+        pointFormatID: header.pointsFormatId,
+        scale: header.scale, offset: header.offset, mins: header.mins,
+      }, [merged]);
     });
   }
 }
 
-// ---- Main entry point --------------------------------------------------------
-async function main() {
+// ── Globals ─────────────────────────────────────────────────────────────
+let scene, camera, renderer, controls;
+let pointCloudObj = null;
+let assetGroups = new Map();
+let allAssets = null;
+let tilesData = null;
+let currentTileIdx = -1;
+const lazLoader = new LAZLoader(POTREE_PATH);
+
+// ── Main ────────────────────────────────────────────────────────────────
+async function init() {
   try {
-    await loadDependencies();
+    setMsg("Loading THREE.js…");
+    await loadScript(POTREE_PATH + "/libs/three.js/build/three.min.js");
 
-    // Verify Potree loaded
-    if (typeof Potree === "undefined") {
-      throw new Error("Potree not found. Check POTREE_PATH (currently: '" + POTREE_PATH +
-                      "'). Open a terminal, cd to this project folder, and run:\n" +
-                      "  python3 -m http.server 8080\nThen open http://localhost:8080/viewer.html");
-    }
+    setMsg("Setting up scene…");
+    setupOrbitControls();
 
-    setLoadingMsg("Initialising viewer…");
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
 
-    // Create Potree viewer
-    const viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
-    viewer.setEDLEnabled(true);
-    viewer.setFOV(60);
-    viewer.setPointBudget(5_000_000);
-    viewer.setBackground("gradient");
-    viewer.loadGUI(() => {
-      viewer.setLanguage("en");
+    camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 10000);
+    camera.position.set(0, 0, 50);
+
+    renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+    controls.screenSpacePanning = true;
+    controls.minDistance = 1;
+    controls.maxDistance = 2000;
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    animate();
+
+    // Load metadata
+    setMsg("Loading tile index & assets…");
+    const [tilesResp, assetsResp] = await Promise.all([
+      fetch("pointcloudjp.json").then(r => r.json()),
+      fetch("assets_with_tiles.geojson").then(r => r.ok ? r.json() : null),
+    ]);
+    tilesData = tilesResp;
+    allAssets = assetsResp;
+
+    // Populate tile selector
+    const sel = document.getElementById("tile_select");
+    tilesData.features.forEach((f, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = "#" + (i+1) + ": " + (f.properties.filename_no_ext || f.properties.filename);
+      sel.appendChild(opt);
+    });
+    sel.addEventListener("change", () => loadTile(+sel.value));
+
+    // Point size slider
+    const slider = document.getElementById("point_size_slider");
+    slider.addEventListener("input", () => {
+      document.getElementById("ps_val").textContent = slider.value;
+      if (pointCloudObj) pointCloudObj.material.size = +slider.value;
     });
 
-    // Expose viewer for debugging
-    window._viewer = viewer;
-
-    // Fetch data files concurrently
-    setLoadingMsg("Loading tile and asset data…");
-    let tilesData, assetsData;
-    try {
-      [tilesData, assetsData] = await Promise.all([
-        fetch("pointcloudjp.json").then(r => {
-          if (!r.ok) throw new Error("Cannot load pointcloudjp.json: " + r.status);
-          return r.json();
-        }),
-        fetch("assets_with_tiles.geojson").then(r => {
-          if (!r.ok) {
-            console.warn("assets_with_tiles.geojson not found — run spatial_join.py first");
-            return null;
-          }
-          return r.json();
-        }),
-      ]);
-    } catch(e) {
-      showError(e.message);
-      throw e;
-    }
-
-    const tiles = tilesData.features;
-    const total = tiles.length;
-    let loadedCount  = 0;
-    let crs          = null;
-    let markersAdded = false;
-    let firstCloud   = null;
-
-    function tryAddMarkers() {
-      if (markersAdded) return;
-      if (!crs || !assetsData) return;
-      markersAdded = true;
-      createAssetMarkers(assetsData, viewer.scene.scene, crs);
-      buildSidebar();
-      const badge = document.getElementById("crs_badge");
-      badge.textContent = "CRS: " + crs.name;
-      badge.style.display = "block";
-    }
-
-    function onCloudLoaded(e, tile) {
-      const pc = e.pointcloud;
-
-      try {
-        viewer.scene.addPointCloud(pc);
-      } catch(err) {
-        console.warn("addPointCloud failed:", err);
-        try { viewer.scene.scene.add(pc); } catch(e2) { /* ignore */ }
-      }
-
-      loadedCount++;
-      setLoadingProgress(loadedCount, total);
-
-      if (loadedCount === 1) {
-        firstCloud = pc;
-
-        // Fly camera to first loaded cloud
-        try {
-          const bb = new THREE.Box3();
-          bb.setFromObject(pc);
-          if (!bb.isEmpty()) {
-            const c  = new THREE.Vector3();
-            bb.getCenter(c);
-            const sz = bb.getSize(new THREE.Vector3());
-            viewer.scene.view.setView(
-              new THREE.Vector3(c.x, c.y - sz.y, c.z + sz.z * 1.5),
-              c
-            );
-          }
-        } catch(e) { console.warn("Camera fly failed:", e); }
-
-        // Detect CRS
-        crs = detectCRS(pc);
-        lastCRS = crs;
-        tryAddMarkers();
-      }
-
-      if (loadedCount === total) {
-        setLoadingMsg("All tiles loaded.");
-        setTimeout(hideLoading, 1200);
-      }
-    }
-
-    // Load all 47 LAZ tiles
-    setLoadingMsg(`Loading ${total} point cloud tiles…`, "0 / " + total);
-    for (const tile of tiles) {
-      const p   = tile.properties;
-      const url = p.baseUrl + p.lasPath;
-      const name = p.filename_no_ext || p.filename;
-
-      try {
-        Potree.loadPointCloud(url, name, e => onCloudLoaded(e, tile));
-      } catch(e) {
-        console.warn("loadPointCloud threw for", name, e);
-        loadedCount++;
-        setLoadingProgress(loadedCount, total);
-      }
-    }
-
-    // If assets fetched but CRS detection takes time, wait 10s then force markers
-    // using a fallback UTM 19N (correct for this Jamaica Plain dataset)
-    setTimeout(() => {
-      if (!crs) {
-        console.warn("CRS not detected after 10 s — using UTM 19N fallback");
-        crs = {
-          name: "UTM19N (fallback)",
-          proj4def: "+proj=utm +zone=19 +datum=WGS84 +units=m +no_defs",
-          zRef: 15, // reasonable above-ground height for Jamaica Plain
-        };
-      }
-      tryAddMarkers();
-    }, 10000);
-
-    // Canvas click → asset info
-    setupClickHandler(viewer);
-
-    // Close button on info panel
     document.getElementById("info_close").addEventListener("click", hideInfoPanel);
+    renderer.domElement.addEventListener("click", onCanvasClick);
 
-  } catch(err) {
-    console.error("Viewer init failed:", err);
-    document.getElementById("loading_message").textContent = "Error: " + err.message;
+    // Load first tile
+    await loadTile(0);
+
+  } catch (err) {
+    console.error(err);
+    setMsg("Error: " + err.message);
     document.getElementById("loading_message").style.color = "#e74c3c";
   }
 }
 
-// Start after DOM is ready
-document.addEventListener("DOMContentLoaded", main);
+// ── Load a single tile ──────────────────────────────────────────────────
+async function loadTile(idx) {
+  if (idx === currentTileIdx) return;
+  currentTileIdx = idx;
+
+  const tile = tilesData.features[idx];
+  const p = tile.properties;
+  const url = p.baseUrl + p.lasPath;
+
+  document.getElementById("tile_select").value = idx;
+  document.getElementById("tile_info").innerHTML =
+    "<b>" + p.filename + "</b><br>Lat: " + p.lat.toFixed(6) + " &nbsp; Lon: " + p.lon.toFixed(6);
+
+  // Cleanup old
+  if (pointCloudObj) {
+    scene.remove(pointCloudObj);
+    pointCloudObj.geometry.dispose();
+    pointCloudObj.material.dispose();
+    pointCloudObj = null;
+  }
+  for (const [, grp] of assetGroups) {
+    scene.remove(grp.points);
+    grp.points.geometry.dispose();
+    grp.points.material.dispose();
+  }
+  assetGroups.clear();
+
+  showLoading(); setMsg("Downloading tile " + (idx+1) + "…"); setProgress(0);
+
+  try {
+    const data = await lazLoader.load(url, pct => {
+      setProgress(pct);
+      if (pct < 45)      setMsg("Downloading tile " + (idx+1) + "…", Math.round(pct/45*100) + "%");
+      else if (pct < 80) setMsg("Decompressing LAZ…", Math.round((pct-45)/35*100) + "%");
+      else               setMsg("Decoding points…",   Math.round((pct-80)/20*100) + "%");
+    });
+
+    if (currentTileIdx !== idx) return; // switched during load
+
+    setMsg("Building point cloud…");
+    buildPointCloud(data);
+
+    if (allAssets) {
+      setMsg("Adding nearby assets…");
+      addFilteredAssets(p.lat, p.lon);
+    }
+    hideLoading();
+  } catch (err) {
+    console.error("Load failed:", err);
+    showError("Failed to load tile: " + err.message);
+    hideLoading();
+  }
+}
+
+// ── Build THREE.Points from decoded LAZ ─────────────────────────────────
+function buildPointCloud(data) {
+  const { positions, colors, numPoints, tightBoundingBox: bb, mean, header } = data;
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+  const hasColor = (header.pointsFormatId === 2 || header.pointsFormatId === 3);
+  const colorF = new Float32Array(numPoints * 3);
+  if (hasColor) {
+    for (let i = 0; i < numPoints; i++) {
+      colorF[i*3] = colors[i*4]/255; colorF[i*3+1] = colors[i*4+1]/255; colorF[i*3+2] = colors[i*4+2]/255;
+    }
+  } else {
+    const intens = data.intensity;
+    let maxI = 0;
+    if (intens) { for (let i = 0; i < numPoints; i++) if (intens[i] > maxI) maxI = intens[i]; }
+    if (maxI === 0) maxI = 1;
+    for (let i = 0; i < numPoints; i++) {
+      const v = intens ? intens[i]/maxI : 0.8;
+      colorF[i*3] = v; colorF[i*3+1] = v; colorF[i*3+2] = v;
+    }
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colorF, 3));
+
+  const size = +document.getElementById("point_size_slider").value;
+  pointCloudObj = new THREE.Points(geo, new THREE.PointsMaterial({
+    size, sizeAttenuation: false, vertexColors: true,
+  }));
+  scene.add(pointCloudObj);
+
+  // Camera
+  const cx = mean[0], cy = mean[1], cz = mean[2];
+  const dx = bb.max[0]-bb.min[0], dy = bb.max[1]-bb.min[1], dz = bb.max[2]-bb.min[2];
+  const ext = Math.max(dx, dy, dz);
+  controls.target.set(cx, cy, cz);
+  camera.position.set(cx, cy - ext*0.6, cz + ext*0.8);
+  camera.up.set(0, 0, 1);
+  controls.update();
+}
+
+// ── Filtered asset markers ──────────────────────────────────────────────
+function addFilteredAssets(tileLat, tileLon) {
+  if (!allAssets) return;
+
+  const nearby = allAssets.features.filter(f => {
+    const g = f.geometry;
+    let lon, lat;
+    if (g.type === "Point") { [lon, lat] = g.coordinates; }
+    else if (g.type === "LineString") { const c = g.coordinates; [lon, lat] = c[Math.floor(c.length/2)]; }
+    else return false;
+    return haversineM(tileLat, tileLon, lat, lon) <= ASSET_RADIUS_M;
+  });
+
+  if (!nearby.length) {
+    document.getElementById("asset_type_list").innerHTML =
+      '<div style="color:#666;">No assets within ' + ASSET_RADIUS_M + ' m</div>';
+    return;
+  }
+
+  const groups = {};
+  for (const f of nearby) {
+    const t = f.properties.asset_type || "UNKNOWN";
+    (groups[t] = groups[t] || []).push(f);
+  }
+
+  const pcMean = getMeanFromGeometry();
+  const tp = tilesData.features[currentTileIdx].properties;
+
+  for (const [type, features] of Object.entries(groups)) {
+    const hex = COLOR_MAP[type] || "#ffffff";
+    const rgb = hexToRgb01(hex);
+    const count = features.length;
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      const g = features[i].geometry;
+      let lon, lat;
+      if (g.type === "Point") { [lon, lat] = g.coordinates; }
+      else if (g.type === "LineString") { const c = g.coordinates; [lon, lat] = c[Math.floor(c.length/2)]; }
+      else { lon = tp.lon; lat = tp.lat; }
+
+      const dLon = (lon - tp.lon) * Math.cos(tp.lat * Math.PI / 180) * 111320;
+      const dLat = (lat - tp.lat) * 111320;
+      pos[i*3] = pcMean[0] + dLon;
+      pos[i*3+1] = pcMean[1] + dLat;
+      pos[i*3+2] = pcMean[2] + 2;
+      col[i*3] = rgb[0]; col[i*3+1] = rgb[1]; col[i*3+2] = rgb[2];
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      size: 10, sizeAttenuation: false, vertexColors: true, depthTest: true, depthWrite: false,
+    }));
+    scene.add(pts);
+    assetGroups.set(type, { points: pts, features, hex, count });
+  }
+  buildSidebar();
+}
+
+function getMeanFromGeometry() {
+  if (!pointCloudObj) return [0,0,0];
+  const p = pointCloudObj.geometry.getAttribute("position");
+  const step = Math.max(1, Math.floor(p.count / 1000));
+  let sx=0, sy=0, sz=0, n=0;
+  for (let i = 0; i < p.count; i += step) { sx += p.getX(i); sy += p.getY(i); sz += p.getZ(i); n++; }
+  return [sx/n, sy/n, sz/n];
+}
+
+// ── Sidebar ─────────────────────────────────────────────────────────────
+function buildSidebar() {
+  const list = document.getElementById("asset_type_list");
+  list.innerHTML = "";
+  const sorted = [...assetGroups.entries()].sort((a,b) => b[1].count - a[1].count);
+  for (const [type, group] of sorted) {
+    const row = document.createElement("div"); row.className = "asset_row";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true;
+    cb.addEventListener("change", () => { group.points.visible = cb.checked; });
+    const sw = document.createElement("div"); sw.className = "asset_swatch"; sw.style.background = group.hex;
+    const lb = document.createElement("span"); lb.className = "asset_label"; lb.textContent = type.replace(/_/g, " ");
+    const ct = document.createElement("span"); ct.className = "asset_count"; ct.textContent = "(" + group.count + ")";
+    row.append(cb, sw, lb, ct); list.appendChild(row);
+    row.addEventListener("click", ev => { if (ev.target !== cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event("change")); } });
+  }
+}
+
+// ── Click → Info panel ──────────────────────────────────────────────────
+function onCanvasClick(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  let bestFeat = null, bestDist = Infinity;
+  for (const [, group] of assetGroups) {
+    if (!group.points.visible) continue;
+    const pos = group.points.geometry.getAttribute("position");
+    for (let i = 0; i < pos.count; i++) {
+      const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).project(camera);
+      if (v.z > 1) continue;
+      const d = Math.sqrt((v.x-mx)**2 + (v.y-my)**2);
+      if (d < bestDist) { bestDist = d; bestFeat = group.features[i]; }
+    }
+  }
+  if (bestFeat && bestDist < 0.04) showInfoPanel(bestFeat); else hideInfoPanel();
+}
+
+function showInfoPanel(feature) {
+  const p = feature.properties, panel = document.getElementById("info_panel");
+  document.getElementById("info_type").textContent = p.asset_type || "Asset";
+  const img = document.getElementById("info_img");
+  if (p.image_url) { img.src = p.image_url; img.style.display = "block"; }
+  else { img.src = ""; img.style.display = "none"; }
+  const fields = [["Feature ID",p.feature_id||"—"],["Condition",p.condition||"—"],
+    ["Tile",p.tile_file||"—"],["Dataset",p.street_dataset||"—"],["Type",p.Type||"—"],["Material",p.Material||"—"]];
+  const tbody = document.querySelector("#info_table tbody"); tbody.innerHTML = "";
+  for (const [l, v] of fields) { const tr = document.createElement("tr"); tr.innerHTML = "<td>"+l+"</td><td>"+v+"</td>"; tbody.appendChild(tr); }
+  panel.classList.add("visible");
+}
+function hideInfoPanel() { document.getElementById("info_panel").classList.remove("visible"); }
+
+// ── Inline OrbitControls (minimal) ──────────────────────────────────────
+function setupOrbitControls() {
+  if (THREE.OrbitControls) return;
+  THREE.OrbitControls = function(cam, dom) {
+    this.camera = cam; this.domElement = dom; this.target = new THREE.Vector3();
+    this.enableDamping = false; this.dampingFactor = 0.05;
+    this.screenSpacePanning = true; this.minDistance = 0; this.maxDistance = Infinity;
+    this.rotateSpeed = 1.0; this.panSpeed = 1.0;
+
+    let sph = new THREE.Spherical(), sphD = new THREE.Spherical();
+    let panOff = new THREE.Vector3(), scale = 1, state = 0;
+    let rStart = new THREE.Vector2(), pStart = new THREE.Vector2();
+
+    this.update = () => {
+      let off = new THREE.Vector3().copy(cam.position).sub(this.target);
+      sph.setFromVector3(off);
+      sph.theta += sphD.theta; sph.phi += sphD.phi;
+      sph.phi = Math.max(0.001, Math.min(Math.PI - 0.001, sph.phi));
+      sph.radius *= scale;
+      sph.radius = Math.max(this.minDistance, Math.min(this.maxDistance, sph.radius));
+      this.target.add(panOff);
+      off.setFromSpherical(sph);
+      cam.position.copy(this.target).add(off);
+      cam.lookAt(this.target);
+      if (this.enableDamping) {
+        sphD.theta *= (1 - this.dampingFactor); sphD.phi *= (1 - this.dampingFactor);
+        panOff.multiplyScalar(1 - this.dampingFactor);
+      } else { sphD.set(0,0,0); panOff.set(0,0,0); }
+      scale = 1;
+    };
+
+    dom.addEventListener("mousedown", e => {
+      if (e.button === 0) { state = 1; rStart.set(e.clientX, e.clientY); }
+      else if (e.button === 2) { state = 2; pStart.set(e.clientX, e.clientY); }
+    });
+    dom.addEventListener("mousemove", e => {
+      if (state === 1) {
+        sphD.theta -= 2*Math.PI*(e.clientX-rStart.x)/dom.clientWidth*this.rotateSpeed;
+        sphD.phi -= 2*Math.PI*(e.clientY-rStart.y)/dom.clientHeight*this.rotateSpeed;
+        rStart.set(e.clientX, e.clientY);
+      } else if (state === 2) {
+        let d = new THREE.Vector3().copy(cam.position).sub(this.target).length();
+        let pL = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 0).multiplyScalar(-2*(e.clientX-pStart.x)*d/dom.clientWidth*this.panSpeed);
+        let pU = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 1).multiplyScalar(2*(e.clientY-pStart.y)*d/dom.clientHeight*this.panSpeed);
+        panOff.add(pL).add(pU); pStart.set(e.clientX, e.clientY);
+      }
+    });
+    dom.addEventListener("mouseup", () => { state = 0; });
+    dom.addEventListener("wheel", e => { scale *= e.deltaY > 0 ? 1/0.95 : 0.95; }, { passive: true });
+    dom.addEventListener("contextmenu", e => e.preventDefault());
+  };
+}
+
+// ── Render loop ─────────────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  if (controls) controls.update();
+  if (renderer && scene && camera) renderer.render(scene, camera);
+}
+
+document.addEventListener("DOMContentLoaded", init);
 </script>
 
 </body>
