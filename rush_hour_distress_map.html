@@ -20,7 +20,46 @@
       }
       #map {
         width: 100vw;
-        height: 100vh;
+        height: calc(100vh - 40px);
+        margin-top: 40px;
+      }
+
+      /* Navigation bar */
+      .nav-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 10000;
+        height: 40px;
+        background: rgba(26, 26, 46, 0.95);
+        border-bottom: 1px solid #444;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        gap: 16px;
+      }
+      .nav-bar a {
+        color: #4ec9b0;
+        text-decoration: none;
+        font-size: 13px;
+        padding: 6px 12px;
+        border-radius: 4px;
+        transition: background 0.2s;
+      }
+      .nav-bar a:hover {
+        background: rgba(78, 201, 176, 0.15);
+      }
+      .nav-bar a.active {
+        background: rgba(78, 201, 176, 0.2);
+        font-weight: 600;
+      }
+      .nav-bar .title {
+        color: #ddd;
+        font-size: 14px;
+        font-weight: 600;
+        margin-right: 12px;
       }
 
       /* Legend */
@@ -127,6 +166,11 @@
     </style>
   </head>
   <body>
+    <div class="nav-bar">
+      <span class="title">CIV2</span>
+      <a href="/" class="active">Map View</a>
+      <a href="/pointcloud">Point Cloud</a>
+    </div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
