@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rush Hour Traffic &amp; Distress Map</title>
+    <title>Jamaica Plain Centre-South Street Traffic Analysis</title>
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -17,11 +17,36 @@
       body {
         font-family: "Segoe UI", system-ui, sans-serif;
         background: #1a1a2e;
+        overflow: hidden;
       }
       #map {
         width: 100vw;
         height: calc(100vh - 40px);
         margin-top: 40px;
+      }
+
+      /* Page heading */
+      .page-heading {
+        position: fixed;
+        top: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        background: rgba(26, 26, 46, 0.92);
+        border: 1px solid #444;
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+        padding: 8px 24px;
+        color: #e0e0e0;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        pointer-events: none;
+      }
+      .page-heading span {
+        color: #4ec9b0;
       }
 
       /* Navigation bar */
@@ -187,6 +212,101 @@
       .cp-tooltip-primary::before {
         border-right-color: rgba(0,0,0,0.8) !important;
       }
+
+      /* ── Mobile responsive ─────────────────────────────────────── */
+      @media (max-width: 768px) {
+        .page-heading {
+          font-size: 13px;
+          padding: 5px 14px;
+          max-width: 92vw;
+          white-space: normal;
+          text-align: center;
+          line-height: 1.3;
+        }
+        .nav-bar {
+          gap: 6px;
+          padding: 0 8px;
+        }
+        .nav-bar .title {
+          font-size: 12px;
+          margin-right: 4px;
+        }
+        .nav-bar a {
+          font-size: 12px;
+          padding: 4px 8px;
+        }
+
+        /* Legend: collapsible on mobile */
+        .legend {
+          max-width: 220px;
+          max-height: 50vh;
+          overflow-y: auto;
+          font-size: 12px;
+          padding: 10px 12px;
+        }
+        .legend h4 {
+          font-size: 13px;
+        }
+
+        /* Info panel: smaller on mobile */
+        .info-panel {
+          font-size: 11px;
+          min-width: 150px;
+          padding: 8px 10px;
+        }
+        .info-panel h4 {
+          font-size: 13px;
+        }
+
+        /* Layer control: scrollable on mobile */
+        .leaflet-control-layers-expanded {
+          max-height: 50vh;
+          overflow-y: auto;
+          font-size: 12px !important;
+        }
+
+        /* Bigger touch targets for layer checkboxes */
+        .leaflet-control-layers label {
+          padding: 4px 0 !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 6px !important;
+          min-height: 28px !important;
+        }
+        .leaflet-control-layers input {
+          width: 18px !important;
+          height: 18px !important;
+        }
+
+        /* Leaflet default controls spacing */
+        .leaflet-top .leaflet-control {
+          margin-top: 6px;
+        }
+        .leaflet-bottom .leaflet-control {
+          margin-bottom: 6px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .page-heading {
+          font-size: 11px;
+          padding: 4px 10px;
+        }
+        .legend {
+          max-width: 180px;
+          font-size: 11px;
+          padding: 8px 10px;
+        }
+        .info-panel {
+          font-size: 10px;
+          min-width: 130px;
+          padding: 6px 8px;
+        }
+        .leaflet-control-layers-expanded {
+          max-height: 40vh;
+          max-width: 200px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -195,6 +315,7 @@
       <a href="/" class="active">Map View</a>
       <a href="/pointcloud">Point Cloud</a>
     </div>
+    <div class="page-heading"><span>Jamaica Plain</span> Centre-South Street Traffic Analysis</div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -838,7 +959,9 @@
           if (e.layer === chokepointLayer) cpUserEnabled = false;
         });
         updateChokepointVisibility();
-        L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
+        // Collapse layer control on mobile for space
+        const isMobile = window.innerWidth <= 768;
+        L.control.layers(baseMaps, overlays, { collapsed: isMobile }).addTo(map);
 
         // ── Legend ──────────────────────────────────────────────────────────
         const legend = L.control({ position: "bottomleft" });
@@ -973,6 +1096,16 @@
           ...assetPts,
         ];
         if (allPts.length) map.fitBounds(L.latLngBounds(allPts).pad(0.1));
+
+        // Auto-fade heading on mobile after 4 seconds
+        if (window.innerWidth <= 768) {
+          const heading = document.querySelector(".page-heading");
+          if (heading) {
+            heading.style.transition = "opacity 1s ease";
+            setTimeout(() => { heading.style.opacity = "0"; }, 4000);
+            setTimeout(() => { heading.style.display = "none"; }, 5200);
+          }
+        }
       })();
     </script>
   </body>
