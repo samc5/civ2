@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rush Hour Traffic &amp; Distress Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; }
+    #map { width: 100vw; height: 100vh; }
+
+    /* Legend */
+    .legend {
+      background: rgba(26, 26, 46, 0.95);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #ddd;
+      font-size: 13px;
+      line-height: 1.6;
+      max-width: 260px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    .legend h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #4ec9b0;
+      border-bottom: 1px solid #333;
+      padding-bottom: 6px;
+    }
+    .legend-section { margin-bottom: 10px; }
+    .legend-section:last-child { margin-bottom: 0; }
+    .legend-label { font-weight: 600; margin-bottom: 4px; color: #aaa; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .legend-circle {
+      border-radius: 50%;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(255,255,255,0.3);
+    }
+    .heatbar {
+      width: 100%;
+      height: 14px;
+      border-radius: 3px;
+      background: linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
+      margin: 4px 0;
+    }
+    .heatbar-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #888;
+    }
+
+    /* Info panel */
+    .info-panel {
+      background: rgba(26, 26, 46, 0.95);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #ddd;
+      font-size: 13px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+      min-width: 200px;
+    }
+    .info-panel h4 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: #4ec9b0;
+    }
+    .info-panel .stat { margin-bottom: 2px; }
+    .info-panel .stat-label { color: #888; }
+
+    /* Layer control styling override */
+    .leaflet-control-layers {
+      background: rgba(26, 26, 46, 0.95) !important;
+      border: 1px solid #444 !important;
+      border-radius: 8px !important;
+      color: #ddd !important;
+    }
+    .leaflet-control-layers-expanded {
+      padding: 8px 12px !important;
+    }
+    .leaflet-control-layers label {
+      color: #ddd !important;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+(async function () {
+  // ── Helpers ──────────────────────────────────────────────────────────
+  function fetchCSV(path) {
+    return new Promise((resolve, reject) => {
+      Papa.parse(path, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: true,
+        complete: r => resolve(r.data),
+        error: reject
+      });
+    });
+  }
+
+  // ── Load data ────────────────────────────────────────────────────────
+  const [trafficRows, distressRows] = await Promise.all([
+    fetchCSV('combined_intersection_15min_counts.csv'),
+    fetchCSV('all_intersection_distresses.csv')
+  ]);
+
+  // ── Process traffic: aggregate rush-hour counts per intersection ────
+  // Rush hour columns: 7:00–7:45 AM (morning) + 5:00–5:45 PM (evening)
+  const rushCols = [
+    '7:00 AM', '7:15 AM', '7:30 AM', '7:45 AM',
+    '5:00 PM', '5:15 PM', '5:30 PM', '5:45 PM'
+  ];
+
+  const intersectionMap = {};  // name → { lat, lon, total }
+  trafficRows.forEach(row => {
+    const name = row['Intersection name'];
+    if (!name) return;
+    const lat = parseFloat(row['latitude of intersection']);
+    const lon = parseFloat(row['longitude of intersection']);
+    if (isNaN(lat) || isNaN(lon)) return;
+
+    if (!intersectionMap[name]) {
+      intersectionMap[name] = { lat, lon, total: 0 };
+    }
+    rushCols.forEach(col => {
+      const v = parseInt(row[col], 10);
+      if (!isNaN(v)) intersectionMap[name].total += v;
+    });
+  });
+
+  const intersections = Object.entries(intersectionMap).map(([name, d]) => ({
+    name, lat: d.lat, lon: d.lon, total: d.total
+  }));
+
+  const maxTraffic = Math.max(...intersections.map(i => i.total));
+  const minTraffic = Math.min(...intersections.map(i => i.total));
+
+  console.log('Intersections:', intersections.length, 'Max rush-hour count:', maxTraffic);
+
+  // ── Process distresses: filter within 20m of a tracked intersection ─
+  const distresses = distressRows.filter(row => {
+    const dist = parseFloat(row['distance_to_intersection_m']);
+    return !isNaN(dist) && dist <= 20;
+  }).map(row => ({
+    id: row.id,
+    type: row.distress_type,
+    severity: (row.severity || '').toLowerCase(),
+    area: row.area_sq_ft,
+    length: row.length_ft,
+    image: row.image,
+    intersection: row.intersection,
+    distance: parseFloat(row.distance_to_intersection_m),
+    lat: parseFloat(row.lat),
+    lon: parseFloat(row.lon)
+  })).filter(d => !isNaN(d.lat) && !isNaN(d.lon));
+
+  console.log('Distresses within 20m:', distresses.length);
+
+  // ── Map setup ────────────────────────────────────────────────────────
+  const center = [
+    intersections.reduce((s, i) => s + i.lat, 0) / intersections.length,
+    intersections.reduce((s, i) => s + i.lon, 0) / intersections.length
+  ];
+
+  const map = L.map('map', { zoomControl: true }).setView(center, 15);
+
+  // Base tiles
+  const darkTile = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 20
+    }
+  );
+  const lightTile = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 20
+    }
+  );
+  darkTile.addTo(map);
+
+  // ── Heatmap layer ───────────────────────────────────────────────────
+  // Each intersection gets a heat point; intensity = normalised rush-hour count
+  const heatData = intersections.map(i => [
+    i.lat, i.lon, i.total / maxTraffic
+  ]);
+
+  const heatLayer = L.heatLayer(heatData, {
+    radius: 40,
+    blur: 30,
+    maxZoom: 18,
+    max: 1.0,
+    gradient: {
+      0.0: '#0000ff',
+      0.25: '#00ffff',
+      0.5: '#00ff00',
+      0.75: '#ffff00',
+      1.0: '#ff0000'
+    }
+  }).addTo(map);
+
+  // ── Intersection markers (click for detail) ─────────────────────────
+  const intMarkers = L.layerGroup();
+  intersections.forEach(i => {
+    const pct = maxTraffic > minTraffic
+      ? (i.total - minTraffic) / (maxTraffic - minTraffic)
+      : 0.5;
+    // Color from blue → red
+    const r = Math.round(255 * pct);
+    const b = Math.round(255 * (1 - pct));
+    const color = `rgb(${r},40,${b})`;
+
+    const marker = L.circleMarker([i.lat, i.lon], {
+      radius: 8,
+      fillColor: color,
+      fillOpacity: 0.9,
+      color: '#fff',
+      weight: 1.5
+    });
+    marker.bindPopup(`
+      <div style="font-family:sans-serif;font-size:13px;">
+        <strong style="color:#4ec9b0;">${i.name}</strong><br>
+        <span style="color:#aaa;">Rush-hour vehicles:</span> <b>${i.total.toLocaleString()}</b><br>
+        <span style="color:#aaa;">Morning (7–8 AM) + Evening (5–6 PM)</span>
+      </div>
+    `);
+    intMarkers.addLayer(marker);
+  });
+  intMarkers.addTo(map);
+
+  // ── Distress markers ────────────────────────────────────────────────
+  const severityConfig = {
+    low:    { radius: 5,  color: '#f1c40f', label: 'Low' },
+    medium: { radius: 9,  color: '#e67e22', label: 'Medium' },
+    high:   { radius: 14, color: '#e74c3c', label: 'High' }
+  };
+
+  const distressLayer = L.layerGroup();
+  distresses.forEach(d => {
+    const cfg = severityConfig[d.severity] || severityConfig.low;
+    const marker = L.circleMarker([d.lat, d.lon], {
+      radius: cfg.radius,
+      fillColor: cfg.color,
+      fillOpacity: 0.75,
+      color: '#fff',
+      weight: 1
+    });
+
+    let popupHTML = `
+      <div style="font-family:sans-serif;font-size:13px;max-width:280px;">
+        <strong style="color:#4ec9b0;">${d.type.replace(/_/g, ' ')}</strong>
+        <span style="background:${cfg.color};color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px;font-size:11px;">${cfg.label}</span><br>
+        <span style="color:#aaa;">Intersection:</span> ${d.intersection}<br>
+        <span style="color:#aaa;">Distance:</span> ${d.distance.toFixed(1)} m<br>`;
+    if (d.area) popupHTML += `<span style="color:#aaa;">Area:</span> ${d.area} sq ft<br>`;
+    if (d.length) popupHTML += `<span style="color:#aaa;">Length:</span> ${d.length} ft<br>`;
+    if (d.image) popupHTML += `<img src="${d.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:4px;margin-top:6px;">`;
+    popupHTML += `</div>`;
+
+    marker.bindPopup(popupHTML);
+    distressLayer.addLayer(marker);
+  });
+  distressLayer.addTo(map);
+
+  // ── Layer control ───────────────────────────────────────────────────
+  const baseMaps = { 'Dark': darkTile, 'Light': lightTile };
+  const overlays = {
+    'Rush Hour Heatmap': heatLayer,
+    'Intersection Points': intMarkers,
+    'Distress Events': distressLayer
+  };
+  L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
+
+  // ── Legend ──────────────────────────────────────────────────────────
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'legend');
+    div.innerHTML = `
+      <h4>Map Legend</h4>
+
+      <div class="legend-section">
+        <div class="legend-label">Rush Hour Heatmap</div>
+        <div class="heatbar"></div>
+        <div class="heatbar-labels">
+          <span>${minTraffic.toLocaleString()}</span>
+          <span>vehicles</span>
+          <span>${maxTraffic.toLocaleString()}</span>
+        </div>
+        <div style="font-size:11px;color:#777;margin-top:2px;">7–8 AM + 5–6 PM combined</div>
+      </div>
+
+      <div class="legend-section">
+        <div class="legend-label">Distress Severity</div>
+        ${Object.values(severityConfig).map(c => `
+          <div class="legend-item">
+            <div class="legend-circle" style="width:${c.radius * 2}px;height:${c.radius * 2}px;background:${c.color};"></div>
+            <span>${c.label}</span>
+          </div>
+        `).join('')}
+        <div style="font-size:11px;color:#777;margin-top:2px;">Only distresses within 20 m of intersection</div>
+      </div>
+    `;
+    return div;
+  };
+  legend.addTo(map);
+
+  // ── Stats panel ────────────────────────────────────────────────────
+  const info = L.control({ position: 'topright' });
+  info.onAdd = function () {
+    const div = L.DomUtil.create('div', 'info-panel');
+    const totalVehicles = intersections.reduce((s, i) => s + i.total, 0);
+    const sevCounts = { high: 0, medium: 0, low: 0 };
+    distresses.forEach(d => { if (sevCounts[d.severity] !== undefined) sevCounts[d.severity]++; });
+    div.innerHTML = `
+      <h4>Summary</h4>
+      <div class="stat"><span class="stat-label">Intersections:</span> ${intersections.length}</div>
+      <div class="stat"><span class="stat-label">Total rush-hour vehicles:</span> ${totalVehicles.toLocaleString()}</div>
+      <div class="stat"><span class="stat-label">Distresses ≤20 m:</span> ${distresses.length}</div>
+      <div class="stat" style="margin-left:10px;font-size:12px;">
+        <span style="color:${severityConfig.high.color};">● ${sevCounts.high} high</span> &nbsp;
+        <span style="color:${severityConfig.medium.color};">● ${sevCounts.medium} medium</span> &nbsp;
+        <span style="color:${severityConfig.low.color};">● ${sevCounts.low} low</span>
+      </div>
+    `;
+    return div;
+  };
+  info.addTo(map);
+
+  // Fit bounds to show everything
+  const allPts = [
+    ...intersections.map(i => [i.lat, i.lon]),
+    ...distresses.map(d => [d.lat, d.lon])
+  ];
+  if (allPts.length) map.fitBounds(L.latLngBounds(allPts).pad(0.1));
+
+})();
+</script>
+</body>
+</html>
