@@ -498,15 +498,36 @@
           assetGroupCounts[g] = 0;
         });
 
+        // Dedicated line layers for SIDEWALK and CURB
+        const sidewalkLayer = L.layerGroup();
+        const curbLayer = L.layerGroup();
+        let sidewalkCount = 0;
+        let curbCount = 0;
+
+        // Line style config for geometric assets
+        const lineStyles = {
+          SIDEWALK: {
+            color: "#808080",
+            weight: 6,
+            opacity: 0.7,
+            dashArray: null,
+            label: "Sidewalk",
+          },
+          CURB: {
+            color: "#73d1b8",
+            weight: 4,
+            opacity: 0.8,
+            dashArray: "8, 4",
+            label: "Curb",
+          },
+        };
+
         // Process each feature from the GeoJSON
         const assetPts = [];
         (assetGeoJSON.features || []).forEach((feature) => {
           const props = feature.properties || {};
           const geom = feature.geometry;
-          if (!geom || geom.type !== "Point") return;
-
-          const [lon, lat] = geom.coordinates;
-          if (isNaN(lat) || isNaN(lon)) return;
+          if (!geom) return;
 
           const assetType = props.asset_type || "UNKNOWN";
           const groupName = typeToGroup[assetType] || "Equipment & Other";
@@ -515,17 +536,7 @@
           const label =
             assetTypeLabels[assetType] || assetType.replace(/_/g, " ");
 
-          assetGroupCounts[groupName]++;
-          assetPts.push([lat, lon]);
-
-          const marker = L.circleMarker([lat, lon], {
-            radius: 5,
-            fillColor: pointColor,
-            fillOpacity: 0.85,
-            color: "#fff",
-            weight: 0.8,
-          });
-
+          // Build popup HTML (shared by points and lines)
           let popupHTML = `
       <div style="font-family:sans-serif;font-size:13px;max-width:300px;">
         <strong style="color:#4ec9b0;">${label}</strong>
@@ -539,6 +550,78 @@
           if (props.image_url)
             popupHTML += `<img src="${props.image_url}" style="width:100%;max-height:180px;object-fit:cover;border-radius:4px;margin-top:6px;" onerror="this.style.display='none'">`;
           popupHTML += `</div>`;
+
+          // Handle LineString geometries (SIDEWALK, CURB, FENCE, RETAINING_WALL, etc.)
+          if (geom.type === "LineString") {
+            const latlngs = geom.coordinates.map((c) => [c[1], c[0]]);
+            if (latlngs.length < 2) return;
+
+            // Add all line vertices to bounds
+            latlngs.forEach((ll) => assetPts.push(ll));
+
+            // SIDEWALK and CURB get their own dedicated layers with distinct styling
+            if (assetType === "SIDEWALK") {
+              const ls = lineStyles.SIDEWALK;
+              const line = L.polyline(latlngs, {
+                color: ls.color,
+                weight: ls.weight,
+                opacity: ls.opacity,
+                lineCap: "round",
+                lineJoin: "round",
+              });
+              line.bindPopup(popupHTML);
+              sidewalkLayer.addLayer(line);
+              sidewalkCount++;
+              assetGroupCounts[groupName]++;
+              return;
+            }
+            if (assetType === "CURB") {
+              const ls = lineStyles.CURB;
+              const line = L.polyline(latlngs, {
+                color: ls.color,
+                weight: ls.weight,
+                opacity: ls.opacity,
+                dashArray: ls.dashArray,
+                lineCap: "round",
+                lineJoin: "round",
+              });
+              line.bindPopup(popupHTML);
+              curbLayer.addLayer(line);
+              curbCount++;
+              assetGroupCounts[groupName]++;
+              return;
+            }
+
+            // Other LineString types (FENCE, RETAINING_WALL, JERSEY_BARRIER) → render as polyline in their group
+            const line = L.polyline(latlngs, {
+              color: pointColor,
+              weight: 3,
+              opacity: 0.75,
+              lineCap: "round",
+              lineJoin: "round",
+            });
+            line.bindPopup(popupHTML);
+            assetLayerGroups[groupName].addLayer(line);
+            assetGroupCounts[groupName]++;
+            return;
+          }
+
+          // Handle Point geometries
+          if (geom.type !== "Point") return;
+
+          const [lon, lat] = geom.coordinates;
+          if (isNaN(lat) || isNaN(lon)) return;
+
+          assetGroupCounts[groupName]++;
+          assetPts.push([lat, lon]);
+
+          const marker = L.circleMarker([lat, lon], {
+            radius: 5,
+            fillColor: pointColor,
+            fillOpacity: 0.85,
+            color: "#fff",
+            weight: 0.8,
+          });
 
           marker.bindPopup(popupHTML);
           assetLayerGroups[groupName].addLayer(marker);
@@ -560,6 +643,12 @@
           const cfg = assetGroups[groupName];
           overlays[`${cfg.icon} ${groupName}`] = assetLayerGroups[groupName];
         });
+        // Dedicated geometry layers for Sidewalk & Curb
+        overlays["━ Sidewalks (" + sidewalkCount + ")"] = sidewalkLayer;
+        overlays["┄ Curbs (" + curbCount + ")"] = curbLayer;
+        // Add sidewalk and curb layers to map by default
+        sidewalkLayer.addTo(map);
+        curbLayer.addTo(map);
         L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
 
         // ── Legend ──────────────────────────────────────────────────────────
@@ -618,6 +707,19 @@
           )
           .join("")}
         <div style="font-size:11px;color:#777;margin-top:2px;">Toggle groups in layer control</div>
+      </div>
+
+      <div class="legend-section">
+        <div class="legend-label">Geometric Features</div>
+        <div class="legend-item">
+          <div style="width:30px;height:6px;background:#808080;border-radius:2px;flex-shrink:0;"></div>
+          <span>Sidewalk (${sidewalkCount})</span>
+        </div>
+        <div class="legend-item">
+          <div style="width:30px;height:4px;background:#73d1b8;border-radius:2px;flex-shrink:0;border-top:2px dashed #73d1b8;background:transparent;"></div>
+          <span>Curb (${curbCount})</span>
+        </div>
+        <div style="font-size:11px;color:#777;margin-top:2px;">Displayed as lines on map</div>
       </div>
     `;
           return div;
